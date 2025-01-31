@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>予約一覧</title>
+    <style>
+        /* エリアごとに背景色を設定 */
+        .area-kiduki { background-color: #ffcccc; }  /* 赤 */
+        .area-ochitsuki { background-color: #ccffcc; }  /* 緑 */
+        .area-shitashimi { background-color: #ccccff; }  /* 青 */
+        .area-nigiwai { background-color: #ffffcc; }  /* 黄色 */
+        .area-kaishaku { background-color: #ffccff; }  /* 紫 */
+    </style>
+</head>
+<body>
+    <h1>予約一覧</h1>
+
+    <form method="get" action="/reservations_list">
+        <label for="date">日付を選択:</label>
+        <input type="date" id="date" name="date" required>
+        <button type="submit">検索</button>
+    </form>
+
+    <br>
+
+    <!-- フィルターボタン -->
+    <a href="/reservations_list?range=7days"><button>次の7日間</button></a>
+    <a href="/reservations_list?range=month"><button>今月の予約</button></a>
+    <br><br>
+
+    <h2>予約状況: {{ selected_date if selected_date else ("次の7日間" if range_type == "7days" else "今月の予約" if range_type == "month" else "日付を選択してください") }}</h2>
+
+    {% if reservations %}
+        <table border="1">
+            <tr>
+                <th>企業名</th>
+                <th>氏名</th>
+                <th>社員番号</th>
+                <th>エリア名</th>
+                <th>開始時刻</th>
+                <th>終了時刻</th>
+                <th>操作</th>
+            </tr>
+            {% for reservation in reservations %}
+            <tr class="{% if 'キヅキ' in reservation.area %}area-kiduki{% elif 'オチツキ' in reservation.area %}area-ochitsuki{% elif 'シタシミ' in reservation.area %}area-shitashimi{% elif 'ニギワイ' in reservation.area %}area-nigiwai{% elif '貸切' in reservation.area %}area-kaishaku{% endif %}">
+                <td>{{ reservation.company }}</td>
+                <td>{{ reservation.name }}</td>
+                <td>{{ reservation.employee_id }}</td>
+                <td>{{ reservation.area if reservation.area else "未設定" }}</td>
+                <td>{{ reservation.start_time }}</td>
+                <td>{{ reservation.end_time }}</td>
+                <td>
+                    <form action="{{ url_for('delete_reservation', reservation_id=reservation.id) }}" method="post">
+                        <button type="submit" onclick="return confirm('本当に削除しますか？');">削除</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </table>
+    {% else %}
+        <p>この期間に予約はありません。</p>
+    {% endif %}
+
+    <br>
+    <a href="/">ホームへ戻る</a>
+</body>
+</html>
