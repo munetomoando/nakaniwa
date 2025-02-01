@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, jsonify, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
 from sqlalchemy import and_  
 from datetime import datetime
 from datetime import timedelta
@@ -12,6 +13,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///reservations.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
+migrate = Migrate(app, db)
 
 # 予約データのテーブル（モデル）
 class Reservation(db.Model):
@@ -20,11 +22,10 @@ class Reservation(db.Model):
     name = db.Column(db.String(100), nullable=False)  # 氏名
     employee_id = db.Column(db.String(20), nullable=False)  # 社員番号
     area = db.Column(db.String(100), nullable=False)  # 予約エリア（複数選択可能）
-    date = db.Column(db.String(10), nullable=False)
+    date = db.Column(db.Date, nullable=False)  # ✅ String → Date に変更
     start_time = db.Column(db.String(5), nullable=False)
     end_time = db.Column(db.String(5), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
 
 
 # **日付ごとの予約データを取得**
@@ -38,10 +39,12 @@ def reservations_by_date():
 
     reservations_list = [
         {
-            "company": r.company,  # ✅ 企業名を追加
+            "company": r.company,
             "name": r.name,
             "employee_id": r.employee_id,
             "area": r.area,
+            "date": r.date.strftime("%Y-%m-%d"),  # ✅ 日付をフォーマット
+            "weekday": r.date.strftime("%A"),  # ✅ 曜日を取得
             "start_time": r.start_time,
             "end_time": r.end_time
         }
@@ -65,12 +68,10 @@ def delete_reservation(reservation_id):
 @app.route('/reservations_list', methods=['GET'])
 def reservations_list():
     date = request.args.get('date')
-    range_type = request.args.get('range')  # 追加: 表示範囲の指定（例: "7days" / "month"）
+    range_type = request.args.get('range')
 
-    # 今日の日付
     today = datetime.today().strftime('%Y-%m-%d')
 
-    # 予約の取得範囲を設定
     if range_type == "7days":
         end_date = (datetime.today() + timedelta(days=7)).strftime('%Y-%m-%d')
         reservations = Reservation.query.filter(
@@ -82,6 +83,10 @@ def reservations_list():
             and_(Reservation.date >= today, Reservation.date <= end_date)
         ).order_by(Reservation.date, Reservation.start_time).all()
     elif date:
+        try:
+            date = datetime.strptime(date, "%Y-%m-%d").date()  # ✅ ここで型変換をチェック
+        except ValueError:
+            date = None
         reservations = Reservation.query.filter_by(date=date).order_by(Reservation.start_time).all()
     else:
         reservations = []
@@ -120,25 +125,25 @@ def reset_points():
 
 # **予約時のポイント計算**
 def calculate_points(date, start_time_str, end_time_str, num_areas):
+    # start_time と end_time は文字列として渡されているので変換
     start_time = datetime.strptime(start_time_str, "%H:%M").time()
     end_time = datetime.strptime(end_time_str, "%H:%M").time()
-    duration = (datetime.combine(datetime.today(), end_time) - datetime.combine(datetime.today(), start_time)).total_seconds() / 1800  # 30分単位
 
-    # 人気時間帯のチェック（ピーク時間帯の一部が含まれているか）
-    weekday = datetime.strptime(date, "%Y-%m-%d").weekday()
-    peak_start_mon = datetime.strptime("10:00", "%H:%M").time()
-    peak_end_mon = datetime.strptime("12:00", "%H:%M").time()
-    peak_start_fri = datetime.strptime("13:00", "%H:%M").time()
-    peak_end_fri = datetime.strptime("18:00", "%H:%M").time()
+    # ✅ date が datetime.date 型ならそのまま weekday() を使用
+    if isinstance(date, str):
+        weekday = datetime.strptime(date, "%Y-%m-%d").weekday()
+    else:
+        weekday = date.weekday()
 
-    is_peak_time = (weekday == 0 and not (end_time <= peak_start_mon or start_time >= peak_end_mon)) or \
-                   (weekday == 4 and not (end_time <= peak_start_fri or start_time >= peak_end_fri))
+    # 30分単位での予約時間の計算
+    duration = (datetime.combine(datetime.today(), end_time) - datetime.combine(datetime.today(), start_time)).total_seconds() / 1800
 
-    # 1エリアあたりの基本ポイント
+    # ピーク時間帯の判定
+    is_peak_time = (weekday == 0 and start_time < time(12, 0)) or (weekday == 4 and end_time > time(13, 0))
+
     cost_per_30min = 20 if is_peak_time else 10
-
-    # **エリア数を考慮したポイント計算**
     total_cost = int(duration) * cost_per_30min * num_areas
+
     return total_cost
 
 @app.route('/reserve', methods=['GET', 'POST'])
@@ -148,9 +153,12 @@ def reserve():
         name = request.form['name']
         employee_id = request.form['employee_id']
         areas = request.form.getlist('area')  # 複数選択のエリア
-        date = request.form['date']
+        date = datetime.strptime(request.form['date'], "%Y-%m-%d").date()
         start_time_str = request.form['start_time']
         end_time_str = request.form['end_time']
+        start_time = datetime.strptime(request.form['start_time'], "%H:%M").time()
+        end_time = datetime.strptime(request.form['end_time'], "%H:%M").time()
+
 
         # 選択したエリアをカンマ区切りで保存
         area = ", ".join(areas)

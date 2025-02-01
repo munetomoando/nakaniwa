@@ -4,65 +4,79 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>予約一覧</title>
-    <style>
-        /* エリアごとに背景色を設定 */
-        .area-kiduki { background-color: #ffcccc; }  /* 赤 */
-        .area-ochitsuki { background-color: #ccffcc; }  /* 緑 */
-        .area-shitashimi { background-color: #ccccff; }  /* 青 */
-        .area-nigiwai { background-color: #ffffcc; }  /* 黄色 */
-        .area-kaishaku { background-color: #ffccff; }  /* 紫 */
-    </style>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
-<body>
-    <h1>予約一覧</h1>
+<body class="bg-light">
+    <div class="container mt-5">
+        <h1 class="text-center mb-4">予約一覧</h1>
 
-    <form method="get" action="/reservations_list">
-        <label for="date">日付を選択:</label>
-        <input type="date" id="date" name="date" required>
-        <button type="submit">検索</button>
-    </form>
+        <div class="card shadow p-4">
+            <form method="get" action="/reservations_list">
+                <div class="mb-3">
+                    <label for="date" class="form-label fw-bold">日付を選択:</label>
+                    <input type="date" id="date" name="date" class="form-control" required>
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary w-100">検索</button>
+                    <a href="/reservations_list?range=7days" class="btn btn-secondary w-100">次の7日間</a>
+                    <a href="/reservations_list?range=month" class="btn btn-secondary w-100">今月の予約</a>
+                </div>
+            </form>
+        </div>
 
-    <br>
+        <div class="card shadow p-4 mt-4">
+            <h4 class="fw-bold">予約状況: 
+                {{ selected_date if selected_date else ("次の7日間" if range_type == "7days" else "今月の予約" if range_type == "month" else "日付を選択してください") }}
+            </h4>
+            
+            {% if selected_date %}
+            <p>選択された日付: {{ selected_date }}</p>
+            {% endif %}            
+            {% if reservations %}
+            <div class="table-responsive">
+                <table class="table table-striped table-hover table-bordered mt-3">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>予約日</th>
+                            <th>曜日</th>
+                            <th>企業名</th>
+                            <th>氏名</th>
+                            <th>社員番号</th>
+                            <th>エリア名</th>
+                            <th>開始時刻</th>
+                            <th>終了時刻</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for reservation in reservations %}
+                        <tr class="{% if 'キヅキ' in reservation.area %}table-danger{% elif 'オチツキ' in reservation.area %}table-success{% elif 'シタシミ' in reservation.area %}table-primary{% elif 'ニギワイ' in reservation.area %}table-warning{% elif '貸切' in reservation.area %}table-info{% endif %}">
+                            <td>{{ reservation.date }}</td>
+                            <td>{{ reservation.date.strftime('%A') | replace('Monday', '月') | replace('Tuesday', '火') | replace('Wednesday', '水') | replace('Thursday', '木') | replace('Friday', '金') | replace('Saturday', '土') | replace('Sunday', '日') }}</td>
+                            <td>{{ reservation.company }}</td>
+                            <td>{{ reservation.name }}</td>
+                            <td>{{ reservation.employee_id }}</td>
+                            <td>{{ reservation.area if reservation.area else "未設定" }}</td>
+                            <td>{{ reservation.start_time }}</td>
+                            <td>{{ reservation.end_time }}</td>
+                            <td>
+                                <form action="{{ url_for('delete_reservation', reservation_id=reservation.id) }}" method="post">
+                                    <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('本当に削除しますか？');">削除</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+                <p class="text-muted">この期間に予約はありません。</p>
+            {% endif %}
+        </div>
 
-    <!-- フィルターボタン -->
-    <a href="/reservations_list?range=7days"><button>次の7日間</button></a>
-    <a href="/reservations_list?range=month"><button>今月の予約</button></a>
-    <br><br>
-
-    <h2>予約状況: {{ selected_date if selected_date else ("次の7日間" if range_type == "7days" else "今月の予約" if range_type == "month" else "日付を選択してください") }}</h2>
-
-    {% if reservations %}
-        <table border="1">
-            <tr>
-                <th>企業名</th>
-                <th>氏名</th>
-                <th>社員番号</th>
-                <th>エリア名</th>
-                <th>開始時刻</th>
-                <th>終了時刻</th>
-                <th>操作</th>
-            </tr>
-            {% for reservation in reservations %}
-            <tr class="{% if 'キヅキ' in reservation.area %}area-kiduki{% elif 'オチツキ' in reservation.area %}area-ochitsuki{% elif 'シタシミ' in reservation.area %}area-shitashimi{% elif 'ニギワイ' in reservation.area %}area-nigiwai{% elif '貸切' in reservation.area %}area-kaishaku{% endif %}">
-                <td>{{ reservation.company }}</td>
-                <td>{{ reservation.name }}</td>
-                <td>{{ reservation.employee_id }}</td>
-                <td>{{ reservation.area if reservation.area else "未設定" }}</td>
-                <td>{{ reservation.start_time }}</td>
-                <td>{{ reservation.end_time }}</td>
-                <td>
-                    <form action="{{ url_for('delete_reservation', reservation_id=reservation.id) }}" method="post">
-                        <button type="submit" onclick="return confirm('本当に削除しますか？');">削除</button>
-                    </form>
-                </td>
-            </tr>
-            {% endfor %}
-        </table>
-    {% else %}
-        <p>この期間に予約はありません。</p>
-    {% endif %}
-
-    <br>
-    <a href="/">ホームへ戻る</a>
+        <div class="text-center mt-4">
+            <a href="/" class="btn btn-outline-secondary">ホームへ戻る</a>
+        </div>
+    </div>
 </body>
 </html>

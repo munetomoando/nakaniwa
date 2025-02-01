@@ -14,7 +14,7 @@
                 .then(response => response.json())
                 .then(data => {
                     let reservationsDiv = document.getElementById("reservations_list");
-                    reservationsDiv.innerHTML = "";
+                    reservationsDiv.innerHTML = "<h5 class='fw-bold mt-3'>先に登録された予約一覧</h5>"; 
 
                     if (data.length === 0) {
                         reservationsDiv.innerHTML = "<p class='text-muted'>この日の予約はありません。</p>";
@@ -57,7 +57,7 @@
                 .then(response => response.json())
                 .then(data => {
                     if (data.points !== undefined) {
-                        document.getElementById("company_points").innerText = `現在のポイント: ${data.points} pt`;
+                        document.getElementById("company_points").innerText = `今月の利用可能ポイント: ${data.points} pt`;
                     } else {
                         document.getElementById("company_points").innerText = "企業情報が見つかりません";
                     }
@@ -117,7 +117,7 @@
                         <option value="E社">E社</option>
                         <option value="F社">F社</option>
                     </select>
-                    <p id="company_points" class="text-muted mt-2">現在のポイント: -</p>
+                    <p id="company_points" class="fw-bold text-primary mt-2">今月の利用可能ポイント: -</p>
                 </div>
 
                 <div class="mb-3">
@@ -129,7 +129,14 @@
                     <label for="employee_id" class="form-label">社員番号:</label>
                     <input type="text" id="employee_id" name="employee_id" class="form-control" required>
                 </div>
-
+                <div class="mb-3">
+                    <label for="date" class="form-label">予約日:</label>
+                    <input type="date" id="date" name="date" class="form-control" required onchange="fetchReservations(); updatePoints();">
+                </div>
+                <div id="reservations_list_container" class="mb-3">
+                    <h5 class="fw-bold mt-3">先に登録された予約一覧</h5>
+                    <div id="reservations_list"></div>
+                </div>
                 <div class="mb-3">
                     <label class="form-label">エリアを選択:</label><br>
                     <div class="form-check form-check-inline">
@@ -149,11 +156,7 @@
                     </div>
                 </div>
 
-                <div class="mb-3">
-                    <label for="date" class="form-label">予約日:</label>
-                    <input type="date" id="date" name="date" class="form-control" required onchange="fetchReservations(); updatePoints();">
-                </div>
-
+                
                 <div class="mb-3">
                     <label for="start_time" class="form-label">開始時刻:</label>
                     <select name="start_time" id="start_time" class="form-select" onchange="updatePoints()">
@@ -180,8 +183,6 @@
                 <button type="submit" class="btn btn-primary w-100">予約する</button>
             </form>
         </div>
-
-        <div id="reservations_list" class="mt-4"></div>
     </div>
 </body>
 </html>
