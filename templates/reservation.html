@@ -6,6 +6,42 @@
     <title>NAKANIWAエリア予約</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     
+    <!-- カスタムスタイル -->
+    <style>
+        body {
+            background-color: #e6f2e6;
+        }
+        .header-image {
+        width: 100%;
+        max-width: 600px; /* 画像の最大幅を設定 */
+        border: 10px solid white; /* 白い枠 */
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* 影をつける */
+        border-radius: 5px; /* 角を少し丸める */
+        transition: transform 0.3s ease; /* ホバー時のアニメーション */
+        }
+        .header-image:hover {
+        transform: translateY(-5px); /* ホバーで少し浮き上がる効果 */
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3); /* ホバー時の影を強調 */
+        }
+        .card {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+        }
+        .btn-primary {
+            background-color: #4caf50;
+            border-color: #4caf50;
+        }
+        .btn-primary:hover {
+            background-color: #45a049;
+            border-color: #45a049;
+        }
+        .form-label {
+            color: #2e7d32;
+        }
+        h1, h5 {
+            color: #2e7d32;
+        }
+    </style>
     <script>
         function fetchReservations() {
             let date = document.getElementById("date").value;
@@ -102,6 +138,10 @@
 </head>
 <body class="bg-light">
     <div class="container mt-5">
+        <!-- ヘッダー画像 -->
+        <div class="text-center mb-4">
+            <img src="{{ url_for('static', filename='areas.png') }}" alt="NAKANIWAの4エリア" class="header-image">
+        </div>
         <h1 class="text-center mb-4">NAKANIWAエリア予約</h1>
 
         <div class="card shadow p-4">
@@ -134,25 +174,25 @@
                     <input type="date" id="date" name="date" class="form-control" required onchange="fetchReservations(); updatePoints();">
                 </div>
                 <div id="reservations_list_container" class="mb-3">
-                    <h5 class="fw-bold mt-3">先に登録された予約一覧</h5>
+                    <h6 class="fw-bold mt-3 form-label">先に登録された予約一覧</h6>
                     <div id="reservations_list"></div>
                 </div>
                 <div class="mb-3">
                     <label class="form-label">エリアを選択:</label><br>
                     <div class="form-check form-check-inline">
-                        <input type="checkbox" name="area" value="キヅキ" class="form-check-input" onchange="updatePoints()"> キヅキ
+                        <input type="checkbox" name="area" value="シタシミ" class="form-check-input area-checkbox" onchange="updateSelection()"> シタシミ
                     </div>
                     <div class="form-check form-check-inline">
-                        <input type="checkbox" name="area" value="オチツキ" class="form-check-input" onchange="updatePoints()"> オチツキ
+                        <input type="checkbox" name="area" value="キヅキ" class="form-check-input area-checkbox" onchange="updateSelection()"> キヅキ
                     </div>
                     <div class="form-check form-check-inline">
-                        <input type="checkbox" name="area" value="シタシミ" class="form-check-input" onchange="updatePoints()"> シタシミ
+                        <input type="checkbox" name="area" value="ニギワイ" class="form-check-input area-checkbox" onchange="updateSelection()"> ニギワイ
                     </div>
                     <div class="form-check form-check-inline">
-                        <input type="checkbox" name="area" value="ニギワイ" class="form-check-input" onchange="updatePoints()"> ニギワイ
+                        <input type="checkbox" name="area" value="オチツキ" class="form-check-input area-checkbox" onchange="updateSelection()"> オチツキ
                     </div>
                     <div class="form-check form-check-inline">
-                        <input type="checkbox" name="area" value="貸切" class="form-check-input" onchange="updatePoints()"> 貸切
+                        <input type="checkbox" name="area" value="貸切" class="form-check-input" id="full-rental" onchange="selectFullRental()"> 貸切
                     </div>
                 </div>
 
@@ -184,5 +224,34 @@
             </form>
         </div>
     </div>
+    <script>
+        function updateSelection() {
+            let areaCheckboxes = document.querySelectorAll('.area-checkbox');
+            let fullRental = document.getElementById('full-rental');
+
+            let selectedCount = 0;
+            areaCheckboxes.forEach(box => {
+                if (box.checked) {
+                    selectedCount++;
+                }
+            });
+
+            if (selectedCount === 4) {
+                areaCheckboxes.forEach(box => box.checked = false);
+                fullRental.checked = true;
+            } else {
+                fullRental.checked = false;
+            }
+        }
+
+        function selectFullRental() {
+            let areaCheckboxes = document.querySelectorAll('.area-checkbox');
+            let fullRental = document.getElementById('full-rental');
+
+            if (fullRental.checked) {
+                areaCheckboxes.forEach(box => box.checked = false);
+            }
+        }
+    </script>
 </body>
 </html>

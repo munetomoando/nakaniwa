@@ -15,6 +15,14 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
+# エリアの表示順を定義
+area_order = {
+    "シタシミ": 1,
+    "キヅキ": 2,
+    "ニギワイ": 3,
+    "オチツキ": 4,
+    "全体貸切": 5
+}
 # 予約データのテーブル（モデル）
 class Reservation(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -143,8 +151,7 @@ def calculate_points(date, start_time_str, end_time_str, num_areas):
 
     cost_per_30min = 20 if is_peak_time else 10
     total_cost = int(duration) * cost_per_30min * num_areas
-
-    return total_cost
+    return max(total_cost, 0)
 
 @app.route('/reserve', methods=['GET', 'POST'])
 def reserve():
@@ -166,7 +173,7 @@ def reserve():
         # **エリア予約の重複チェック**
         all_areas = {"キヅキ", "オチツキ", "シタシミ", "ニギワイ"}  # ✅ エリアのセット
 
-        is_full_reservation = "貸切" in areas  # 貸切が選ばれているか
+        is_full_reservation = "全体貸切" in areas  # 貸切が選ばれているか
         reserved_areas = set(areas)  # 予約しようとしているエリア（セット）
 
         # **データベース内の既存予約を取得**
@@ -186,7 +193,7 @@ def reserve():
                 if existing_reserved_areas & all_areas:  # 交差があるか
                     return render_template("error.html", message=f"エラー: {date} の {start_time_str} 〜 {end_time_str} はすでに予約されているため、貸切予約できません。")
             else:
-                if "貸切" in existing_reserved_areas:
+                if "全体貸切" in existing_reserved_areas:
                     return render_template("error.html", message=f"エラー: {date} の {start_time_str} 〜 {end_time_str} は貸切予約済みのため、個別エリアの予約はできません。")
 
         # **企業のポイントを取得**
@@ -196,7 +203,7 @@ def reserve():
 
         # **予約したエリア数をカウント**
         num_areas = len(areas)
-        if "貸切" in areas:
+        if "全体貸切" in areas:
             num_areas = 4  # 貸切は4エリア分
 
         # **必要ポイントを計算**
