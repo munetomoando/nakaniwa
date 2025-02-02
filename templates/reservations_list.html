@@ -24,6 +24,81 @@
             </form>
         </div>
 
+
+<!-- カレンダー表示用のDIV -->
+<div id="calendar" class="mt-4"></div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var calendarEl = document.getElementById('calendar');
+    
+        var calendar = new FullCalendar.Calendar(calendarEl, {
+            initialView: 'dayGridMonth',  // 月表示
+            locale: 'ja',  // 日本語設定
+            headerToolbar: {
+                left: 'prev,next today',
+                center: 'title',
+                right: 'dayGridMonth,timeGridWeek,timeGridDay'  // 月/週/日 表示切替
+            },
+            events: function(fetchInfo, successCallback, failureCallback) {
+                // Flask APIから予約データを取得
+                fetch('/reservations_by_date?start=' + fetchInfo.startStr + '&end=' + fetchInfo.endStr)
+                    .then(response => response.json())
+                    .then(data => {
+                        // 予約データをFullCalendarの形式に変換
+                        let events = data.map(reservation => ({
+                            title: `${reservation.company} - ${reservation.area}`,
+                            start: `${reservation.date}T${reservation.start_time}`,
+                            end: `${reservation.date}T${reservation.end_time}`,
+                            backgroundColor: getAreaColor(reservation.area)
+                        }));
+                        successCallback(events);
+                    })
+                    .catch(error => {
+                        console.error('予約データの取得エラー:', error);
+                        failureCallback(error);
+                    });
+            }
+        });
+    
+        calendar.render();
+    });
+    
+    // エリアごとの色分け設定
+    function getAreaColor(area) {
+        switch(area) {
+            case 'キヅキ': return '#f8d7da';  // 赤系
+            case 'オチツキ': return '#d4edda';  // 緑系
+            case 'シタシミ': return '#cce5ff';  // 青系
+            case 'ニギワイ': return '#fff3cd';  // 黄系
+            case '貸切': return '#d1ecf1';  // 水色系
+            default: return '#e2e3e5';  // グレー
+        }
+    }
+    </script>
+    
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            fetch('/get_all_company_points')
+                .then(response => response.json())
+                .then(data => {
+                    const pointsList = document.getElementById('company_points_list');
+                    pointsList.innerHTML = '';
+        
+                    const companies = ['A社', 'B社', 'C社', 'D社', 'E社', 'F社'];
+                    companies.forEach(company => {
+                        const points = data[company] !== undefined ? data[company] : 0;
+                        const listItem = document.createElement('li');
+                        listItem.className = 'list-group-item d-flex justify-content-between align-items-center';
+                        listItem.innerHTML = `${company} <span class="badge bg-primary rounded-pill">${points} pt</span>`;
+                        pointsList.appendChild(listItem);
+                    });
+                })
+                .catch(error => console.error('ポイント取得エラー:', error));
+        });
+        </script>
+        
         <div class="card shadow p-4 mt-4">
             <h4 class="fw-bold">予約状況: 
                 {{ selected_date if selected_date else ("次の7日間" if range_type == "7days" else "今月の予約" if range_type == "month" else "日付を選択してください") }}
@@ -73,6 +148,58 @@
                 <p class="text-muted">この期間に予約はありません。</p>
             {% endif %}
         </div>
+
+
+        <div class="container mt-4">
+            <h2 class="text-center mb-4">企業ポイント管理</h2>
+        
+            <!-- 企業ポイント加算フォーム -->
+            <div class="card shadow p-4 mb-4">
+                <form action="/add_points" method="post" class="row g-3">
+                    <div class="col-md-4">
+                        <label for="company" class="form-label">企業を選択:</label>
+                        <select name="company" id="company" class="form-select" required>
+                            <option value="">企業を選択</option>
+                            <option value="A社">A社</option>
+                            <option value="B社">B社</option>
+                            <option value="C社">C社</option>
+                            <option value="D社">D社</option>
+                            <option value="E社">E社</option>
+                            <option value="F社">F社</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="points" class="form-label">加算ポイント:</label>
+                        <select name="points" id="points" class="form-select" required>
+                            <option value="100">100ポイント</option>
+                            <option value="200">200ポイント</option>
+                            <option value="300">300ポイント</option>
+                            <option value="400">400ポイント</option>
+                            <option value="500">500ポイント</option>
+                            <option value="600">600ポイント</option>
+                            <option value="700">700ポイント</option>
+                            <option value="800">800ポイント</option>
+                            <option value="900">900ポイント</option>
+                            <option value="1000">1000ポイント</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4 d-flex align-items-end">
+                        <button type="submit" class="btn btn-success w-100">ポイントを加算</button>
+                    </div>
+                </form>
+            </div>
+        
+            <!-- 現在のポイント表示 -->
+            <div class="card shadow p-4">
+                <h4 class="fw-bold">現在の企業ポイント</h4>
+                <ul id="company_points_list" class="list-group mt-3">
+                    <!-- JavaScriptで動的にポイントを表示 -->
+                </ul>
+            </div>
+        </div>
+                <!-- 既存のBootstrapリンクの下に追加 -->
+<link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/main.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/main.min.js"></script>
 
         <div class="text-center mt-4">
             <a href="/" class="btn btn-outline-secondary">ホームへ戻る</a>

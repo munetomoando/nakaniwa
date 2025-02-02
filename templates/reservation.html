@@ -89,11 +89,11 @@
             let company = document.getElementById("company").value;
             if (!company) return;
 
-            fetch(`/get_company_points?company=${company}`)
+            fetch('/get_all_company_points')
                 .then(response => response.json())
                 .then(data => {
-                    if (data.points !== undefined) {
-                        document.getElementById("company_points").innerText = `今月の利用可能ポイント: ${data.points} pt`;
+                    if (data[company] !== undefined) {
+                        document.getElementById("company_points").innerText = `今月の利用可能ポイント: ${data[company]} pt`;
                     } else {
                         document.getElementById("company_points").innerText = "企業情報が見つかりません";
                     }

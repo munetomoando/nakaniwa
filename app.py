@@ -35,31 +35,60 @@ class Reservation(db.Model):
     end_time = db.Column(db.String(5), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+# ポイント管理モデル
+class CompanyPoints(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    company = db.Column(db.String(50), unique=True, nullable=False)  # 企業名
+    points = db.Column(db.Integer, default=1000)  # 初期ポイント
+
+@app.route('/add_points', methods=['POST'])
+def add_points():
+    company = request.form.get('company')
+    points_to_add = int(request.form.get('points'))
+
+    company_record = CompanyPoints.query.filter_by(company=company).first()
+    if company_record:
+        company_record.points += points_to_add
+    else:
+        company_record = CompanyPoints(company=company, points=points_to_add)
+        db.session.add(company_record)
+    
+    db.session.commit()
+    return redirect(url_for('reservations_list'))
+
+@app.route('/get_all_company_points')
+def get_all_company_points():
+    companies = CompanyPoints.query.all()
+    points_data = {company.company: company.points for company in companies}
+    return jsonify(points_data)
+
 
 # **日付ごとの予約データを取得**
 @app.route('/reservations_by_date')
 def reservations_by_date():
-    date = request.args.get('date')
-    if not date:
-        return jsonify({"error": "日付が指定されていません", "reservations": []})
+    start_date = request.args.get('start')
+    end_date = request.args.get('end')
+    
+    if start_date and end_date:
+        reservations = Reservation.query.filter(
+            Reservation.date >= start_date,
+            Reservation.date <= end_date
+        ).order_by(Reservation.date, Reservation.start_time).all()
+    else:
+        return jsonify([])
 
-    reservations = Reservation.query.filter_by(date=date).order_by(Reservation.start_time).all()
-
-    reservations_list = [
-        {
-            "company": r.company,
-            "name": r.name,
-            "employee_id": r.employee_id,
-            "area": r.area,
-            "date": r.date.strftime("%Y-%m-%d"),  # ✅ 日付をフォーマット
-            "weekday": r.date.strftime("%A"),  # ✅ 曜日を取得
-            "start_time": r.start_time,
-            "end_time": r.end_time
-        }
-        for r in reservations
-    ]
+    reservations_list = [{
+        "company": r.company,
+        "name": r.name,
+        "employee_id": r.employee_id,
+        "area": r.area,
+        "date": r.date.strftime("%Y-%m-%d"),
+        "start_time": r.start_time,
+        "end_time": r.end_time
+    } for r in reservations]
 
     return jsonify(reservations_list)
+
 
 
 # **予約削除機能**
@@ -268,6 +297,23 @@ def get_company_points():
         return jsonify({"points": company.points})
     else:
         return jsonify({"error": "企業が見つかりません"}), 404
+        
+
+@app.route('/dashboard/<company>')
+def dashboard(company):
+    reservations = Reservation.query.filter_by(company=company).all()
+    company_points = get_company_points(company)  # 企業ポイントを取得する関数
+
+    # テンプレートファイル名を動的に選択
+    template_name = f'dashboard-{company}.html'
+    return render_template(template_name, company=company, reservations=reservations, points=company_points)
+
+@app.route('/cancel_reservation/<int:reservation_id>', methods=['POST'])
+def cancel_reservation(reservation_id):
+    reservation = Reservation.query.get_or_404(reservation_id)
+    db.session.delete(reservation)
+    db.session.commit()
+    return redirect(url_for('dashboard', company=reservation.company))
 
 if __name__ == '__main__':
     init_db()  # アプリ起動時にデータベースを作成
