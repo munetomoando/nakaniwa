@@ -293,23 +293,47 @@ def reserve():
 
 
 
+
 @app.route('/calculate_points', methods=['GET'])
-def get_required_points():
+def calculate_reservation_points():
     date = request.args.get('date')
     start_time = request.args.get('start_time')
     end_time = request.args.get('end_time')
-    num_areas = request.args.get('num_areas', "1")  # デフォルト1
+    num_areas = request.args.get('num_areas')
 
-    if not date or not start_time or not end_time:
-        return jsonify({"points": 0})
+    # デバッグログ
+    print(f"Received: date={date}, start_time={start_time}, end_time={end_time}, num_areas={num_areas}")
+
+    # 入力値のバリデーション
+    if not date or not start_time or not end_time or not num_areas:
+        return jsonify({'error': 'Invalid input'}), 400
 
     try:
-        num_areas = int(num_areas)  # 確実に整数に変換
+        num_areas = int(num_areas)
     except ValueError:
-        return jsonify({"error": "エリア数が無効です"}), 400
+        print("Invalid num_areas")
+        return jsonify({'error': 'Invalid num_areas'}), 400
 
-    required_points = calculate_points(date, start_time, end_time, num_areas)
-    return jsonify({"points": required_points})
+    # 時刻の処理
+    try:
+        num_areas = int(num_areas)
+        start_hour, start_minute = map(int, start_time.split(':'))
+        end_hour, end_minute = map(int, end_time.split(':'))
+        duration_minutes = (end_hour * 60 + end_minute) - (start_hour * 60 + start_minute)
+
+        if duration_minutes <= 0:
+            return jsonify({'error': 'Invalid time range'}), 400
+
+        time_slots = duration_minutes / 30
+        base_points_per_area = 10
+        total_points = int(base_points_per_area * num_areas * time_slots)
+
+        print(f"Calculated points: {total_points}")
+        return jsonify({'points': total_points})
+
+    except Exception as e:
+        print(f"Error during calculation: {e}")
+        return jsonify({'error': 'Calculation error'}), 500
 
 
 
