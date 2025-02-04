@@ -54,7 +54,7 @@ def add_points():
         db.session.add(company_record)
     
     db.session.commit()
-    return redirect(url_for('reservations_list'))
+    return jsonify({'success': True, 'message': 'ポイントが加算されました'})
 
 @app.route('/get_all_company_points')
 def get_all_company_points():
