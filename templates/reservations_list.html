@@ -77,10 +77,9 @@
     }
     </script>
     
-
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            fetch('/get_all_company_points')
+            fetch(`/get_all_company_points?timestamp=${new Date().getTime()}`)
                 .then(response => response.json())
                 .then(data => {
                     const pointsList = document.getElementById('company_points_list');
@@ -99,6 +98,40 @@
         });
         </script>
         
+        <script>
+        document.querySelector('form[action="/add_points"]').addEventListener('submit', function(event) {
+            event.preventDefault();  // デフォルトのフォーム送信を防ぐ
+            
+            fetch('/add_points', {
+                method: 'POST',
+                body: new FormData(this)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('ポイントが加算されました');
+                    // ポイントリストを更新
+                    fetch('/get_all_company_points')
+                        .then(response => response.json())
+                        .then(data => {
+                            const pointsList = document.getElementById('company_points_list');
+                            pointsList.innerHTML = '';
+                            const companies = ['A社', 'B社', 'C社', 'D社', 'E社', 'F社'];
+                            companies.forEach(company => {
+                                const points = data[company] !== undefined ? data[company] : 0;
+                                const listItem = document.createElement('li');
+                                listItem.className = 'list-group-item d-flex justify-content-between align-items-center';
+                                listItem.innerHTML = `${company} <span class="badge bg-primary rounded-pill">${points} pt</span>`;
+                                pointsList.appendChild(listItem);
+                            });
+                        });
+                } else {
+                    alert('ポイント加算に失敗しました');
+                }
+            });
+        });
+    </script>
+
         <div class="card shadow p-4 mt-4">
             <h4 class="fw-bold">予約状況: 
                 {{ selected_date if selected_date else ("次の7日間" if range_type == "7days" else "今月の予約" if range_type == "month" else "日付を選択してください") }}

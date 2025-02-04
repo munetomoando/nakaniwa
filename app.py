@@ -58,25 +58,55 @@ def add_points():
 
 @app.route('/get_all_company_points')
 def get_all_company_points():
-    companies = CompanyPoints.query.all()
-    points_data = {company.company: company.points for company in companies}
+    # データベースから最新のポイントを取得
+    points_data = {}
+    companies = ['A社', 'B社', 'C社', 'D社', 'E社', 'F社']
+    for company in companies:
+        result = db.session.query(CompanyPoints).filter_by(company=company).first()
+        if result:
+            points_data[company] = result.points
+        else:
+            points_data[company] = 0
     return jsonify(points_data)
 
+
+from datetime import datetime
 
 # **日付ごとの予約データを取得**
 @app.route('/reservations_by_date')
 def reservations_by_date():
-    start_date = request.args.get('start')
-    end_date = request.args.get('end')
-    
-    if start_date and end_date:
-        reservations = Reservation.query.filter(
-            Reservation.date >= start_date,
-            Reservation.date <= end_date
-        ).order_by(Reservation.date, Reservation.start_time).all()
-    else:
-        return jsonify([])
+    date_str = request.args.get('date')  # 単一の日付 (例: '2025-02-03')
+    start_date_str = request.args.get('start')  # 範囲の開始日 (例: '2025-02-01')
+    end_date_str = request.args.get('end')  # 範囲の終了日 (例: '2025-02-07')
 
+    # 単一の日付が指定された場合
+    if date_str:
+        try:
+            date_obj = datetime.strptime(date_str, '%Y-%m-%d').date()  # 日付をオブジェクトに変換
+        except ValueError:
+            return jsonify([])  # 日付の形式が不正な場合、空リストを返す
+
+        # データベースからその日付の予約を取得
+        reservations = Reservation.query.filter_by(date=date_obj).order_by(Reservation.start_time).all()
+
+    # 日付範囲が指定された場合
+    elif start_date_str and end_date_str:
+        try:
+            start_date_obj = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+            end_date_obj = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+        except ValueError:
+            return jsonify([])
+
+        # データベースから範囲内の予約を取得
+        reservations = Reservation.query.filter(
+            Reservation.date >= start_date_obj,
+            Reservation.date <= end_date_obj
+        ).order_by(Reservation.date, Reservation.start_time).all()
+
+    else:
+        return jsonify([])  # パラメータが指定されていない場合は空リストを返す
+
+    # 取得した予約データをJSON形式で返す
     reservations_list = [{
         "company": r.company,
         "name": r.name,
@@ -88,8 +118,6 @@ def reservations_by_date():
     } for r in reservations]
 
     return jsonify(reservations_list)
-
-
 
 # **予約削除機能**
 @app.route('/delete_reservation/<int:reservation_id>', methods=['POST'])
@@ -195,7 +223,6 @@ def reserve():
         start_time = datetime.strptime(request.form['start_time'], "%H:%M").time()
         end_time = datetime.strptime(request.form['end_time'], "%H:%M").time()
 
-
         # 選択したエリアをカンマ区切りで保存
         area = ", ".join(areas)
 
@@ -204,6 +231,10 @@ def reserve():
 
         is_full_reservation = "全体貸切" in areas  # 貸切が選ばれているか
         reserved_areas = set(areas)  # 予約しようとしているエリア（セット）
+
+        # エリア名の統一: "貸切" を "全体貸切" に変換
+        areas = [area if area != "貸切" else "全体貸切" for area in request.form.getlist('area')]
+        area = ", ".join(areas)  # 選択したエリアをカンマ区切りで保存
 
         # **データベース内の既存予約を取得**
         existing_reservations = Reservation.query.filter(
@@ -216,14 +247,16 @@ def reserve():
 
         # **貸切 vs 通常エリアの競合チェック**
         for res in existing_reservations:
-            existing_reserved_areas = set(res.area.split(", "))  # 既存予約のエリア（セット）
+            existing_reserved_areas = set(area.strip() for area in res.area.split(", "))  # 既存予約エリアのスペース除去
 
-            if is_full_reservation:
-                if existing_reserved_areas & all_areas:  # 交差があるか
+            if "全体貸切" in areas:  # 貸切予約を確認
+                if existing_reserved_areas & all_areas:  # 既存のエリアと重複していればエラー
                     return render_template("error.html", message=f"エラー: {date} の {start_time_str} 〜 {end_time_str} はすでに予約されているため、貸切予約できません。")
             else:
                 if "全体貸切" in existing_reserved_areas:
                     return render_template("error.html", message=f"エラー: {date} の {start_time_str} 〜 {end_time_str} は貸切予約済みのため、個別エリアの予約はできません。")
+                if existing_reserved_areas & set(areas):  # 個別エリアの重複確認
+                    return render_template("error.html", message=f"エラー: {date} の {start_time_str} 〜 {end_time_str} にすでに予約されているエリアがあります。")
 
         # **企業のポイントを取得**
         company = Company.query.filter_by(name=company_name).first()
@@ -258,7 +291,12 @@ def reserve():
         company.points -= required_points
         db.session.commit()
 
-        return f"予約完了: {date} の {start_time_str} から {end_time_str} まで {area} を予約しました！（企業: {company_name}, 消費ポイント: {required_points}pt, 残り: {company.points}pt）"
+        # **予約完了後にポイント情報をJSONで返却**
+        response = {
+            'message': f"予約完了: {date} の {start_time_str} から {end_time_str} まで {area} を予約しました！（企業: {company_name}, 消費ポイント: {required_points}pt, 残り: {company.points}pt）",
+            'remaining_points': company.points
+        }
+        return jsonify(response)
 
     return render_template('reservation.html')
 
