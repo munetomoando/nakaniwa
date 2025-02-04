@@ -63,7 +63,7 @@ def get_all_company_points():
     companies = ['A社', 'B社', 'C社', 'D社', 'E社', 'F社']
     for company in companies:
         result = db.session.query(CompanyPoints).filter_by(company=company).first()
-        if result:
+        if result and result.points is not None:
             points_data[company] = result.points
         else:
             points_data[company] = 0
@@ -213,92 +213,83 @@ def calculate_points(date, start_time_str, end_time_str, num_areas):
 @app.route('/reserve', methods=['GET', 'POST'])
 def reserve():
     if request.method == 'POST':
-        company_name = request.form['company']
-        name = request.form['name']
-        employee_id = request.form['employee_id']
-        areas = request.form.getlist('area')  # 複数選択のエリア
-        date = datetime.strptime(request.form['date'], "%Y-%m-%d").date()
-        start_time_str = request.form['start_time']
-        end_time_str = request.form['end_time']
-        start_time = datetime.strptime(request.form['start_time'], "%H:%M").time()
-        end_time = datetime.strptime(request.form['end_time'], "%H:%M").time()
+        try:
+            company_name = request.form['company']
+            name = request.form['name']
+            employee_id = request.form['employee_id']
+            areas = request.form.getlist('area')  # 複数選択のエリア
+            date = datetime.strptime(request.form['date'], "%Y-%m-%d").date()
+            start_time_str = request.form['start_time']
+            end_time_str = request.form['end_time']
+            start_time = datetime.strptime(start_time_str, "%H:%M").time()
+            end_time = datetime.strptime(end_time_str, "%H:%M").time()
 
-        # 選択したエリアをカンマ区切りで保存
-        area = ", ".join(areas)
+            area = ", ".join(areas)  # 選択したエリアをカンマ区切りで保存
 
-        # **エリア予約の重複チェック**
-        all_areas = {"キヅキ", "オチツキ", "シタシミ", "ニギワイ"}  # ✅ エリアのセット
+            # **エリア予約の重複チェック**
+            all_areas = {"キヅキ", "オチツキ", "シタシミ", "ニギワイ"}
 
-        is_full_reservation = "全体貸切" in areas  # 貸切が選ばれているか
-        reserved_areas = set(areas)  # 予約しようとしているエリア（セット）
+            existing_reservations = Reservation.query.filter(
+                and_(
+                    Reservation.date == date,
+                    Reservation.start_time < end_time_str,
+                    Reservation.end_time > start_time_str
+                )
+            ).all()
 
-        # エリア名の統一: "貸切" を "全体貸切" に変換
-        areas = [area if area != "貸切" else "全体貸切" for area in request.form.getlist('area')]
-        area = ", ".join(areas)  # 選択したエリアをカンマ区切りで保存
+            for res in existing_reservations:
+                existing_reserved_areas = set(area.strip() for area in res.area.split(", "))
+                if "全体貸切" in areas:
+                    if existing_reserved_areas & all_areas:
+                        return jsonify({"message": f"エラー: {date} の {start_time_str} 〜 {end_time_str} はすでに予約されています。"}), 400
+                else:
+                    if "全体貸切" in existing_reserved_areas:
+                        return jsonify({"message": f"エラー: {date} の {start_time_str} 〜 {end_time_str} は貸切予約済みのため、個別エリアの予約はできません。"}), 400
+                    if existing_reserved_areas & set(areas):
+                        return jsonify({"message": f"エラー: {date} の {start_time_str} 〜 {end_time_str} にすでに予約されているエリアがあります。"}), 400
 
-        # **データベース内の既存予約を取得**
-        existing_reservations = Reservation.query.filter(
-            and_(
-                Reservation.date == date,
-                Reservation.start_time < end_time_str,
-                Reservation.end_time > start_time_str
+            # 企業のポイントをCompanyPointsテーブルから取得
+            company_record = CompanyPoints.query.filter_by(company=company_name).first()
+            if not company_record:
+                return jsonify({"message": f"エラー: 企業情報が見つかりません（{company_name}）"}), 400
+
+            # **必要ポイントの計算**
+            num_areas = 4 if "全体貸切" in areas else len(areas)
+            required_points = calculate_points(date, start_time_str, end_time_str, num_areas)
+
+            # ポイントが足りない場合はエラー
+            if company_record.points < required_points:
+                return jsonify({"message": f"エラー: ポイントが不足しています（必要: {required_points}pt, 保有: {company_record.points}pt）"}), 400
+            
+            # **予約データの保存**
+            new_reservation = Reservation(
+                company=company_name,
+                name=name,
+                employee_id=employee_id,
+                area=area,
+                date=date,
+                start_time=start_time_str,
+                end_time=end_time_str
             )
-        ).all()
+            db.session.add(new_reservation)
 
-        # **貸切 vs 通常エリアの競合チェック**
-        for res in existing_reservations:
-            existing_reserved_areas = set(area.strip() for area in res.area.split(", "))  # 既存予約エリアのスペース除去
+            # **ポイントを減算**
+            company_record.points -= required_points
+            db.session.commit()
 
-            if "全体貸切" in areas:  # 貸切予約を確認
-                if existing_reserved_areas & all_areas:  # 既存のエリアと重複していればエラー
-                    return render_template("error.html", message=f"エラー: {date} の {start_time_str} 〜 {end_time_str} はすでに予約されているため、貸切予約できません。")
-            else:
-                if "全体貸切" in existing_reserved_areas:
-                    return render_template("error.html", message=f"エラー: {date} の {start_time_str} 〜 {end_time_str} は貸切予約済みのため、個別エリアの予約はできません。")
-                if existing_reserved_areas & set(areas):  # 個別エリアの重複確認
-                    return render_template("error.html", message=f"エラー: {date} の {start_time_str} 〜 {end_time_str} にすでに予約されているエリアがあります。")
+            # **予約完了レスポンス**
+            response = {
+                'message': f"予約完了: {date} の {start_time_str} から {end_time_str} まで {area} を予約しました！",
+                'remaining_points': company_record.points
+            }
+            return jsonify(response), 200
 
-        # **企業のポイントを取得**
-        company = Company.query.filter_by(name=company_name).first()
-        if not company:
-            return render_template("error.html", message=f"エラー: 企業情報が見つかりません（{company_name}）")
-
-        # **予約したエリア数をカウント**
-        num_areas = len(areas)
-        if "全体貸切" in areas:
-            num_areas = 4  # 貸切は4エリア分
-
-        # **必要ポイントを計算**
-        required_points = calculate_points(date, start_time_str, end_time_str, num_areas)
-
-        # **ポイントが足りない場合はエラー**
-        if company.points < required_points:
-            return render_template("error.html", message=f"エラー: ポイントが不足しています（必要: {required_points}pt, 保有: {company.points}pt）")
-
-        # **予約データをデータベースに保存**
-        new_reservation = Reservation(
-            company=company_name,
-            name=name,
-            employee_id=employee_id,
-            area=area,
-            date=date,
-            start_time=start_time_str,
-            end_time=end_time_str
-        )
-        db.session.add(new_reservation)
-
-        # **ポイントを減らす**
-        company.points -= required_points
-        db.session.commit()
-
-        # **予約完了後にポイント情報をJSONで返却**
-        response = {
-            'message': f"予約完了: {date} の {start_time_str} から {end_time_str} まで {area} を予約しました！（企業: {company_name}, 消費ポイント: {required_points}pt, 残り: {company.points}pt）",
-            'remaining_points': company.points
-        }
-        return jsonify(response)
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({"message": f"サーバーエラーが発生しました: {str(e)}"}), 500
 
     return render_template('reservation.html')
+
 
 
 
