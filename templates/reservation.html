@@ -270,7 +270,19 @@
     <script>
         document.querySelector('form[action="/reserve"]').addEventListener('submit', function(event) {
             event.preventDefault();  // デフォルトのフォーム送信を防止
-        
+            
+            const startTime = document.getElementById('start_time').value;
+            const endTime = document.getElementById('end_time').value;
+
+            // 開始時間と終了時間をDateオブジェクトに変換して比較
+            const startDateTime = new Date(`1970-01-01T${startTime}:00`);
+            const endDateTime = new Date(`1970-01-01T${endTime}:00`);
+
+            // 時間の逆転チェック
+            if (startDateTime >= endDateTime) {
+                alert('終了時間は開始時間より後に設定してください。');
+                return;  // 送信中止
+            }
             // 現在の企業ポイントを取得
             const companyPointsText = document.getElementById('company_points').innerText.match(/\d+/);
             const companyPoints = companyPointsText ? parseInt(companyPointsText[0]) : 0;

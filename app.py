@@ -222,8 +222,14 @@ def reserve():
             date = datetime.strptime(request.form['date'], "%Y-%m-%d").date()
             start_time_str = request.form['start_time']
             end_time_str = request.form['end_time']
-            start_time = datetime.strptime(start_time_str, "%H:%M").time()
-            end_time = datetime.strptime(end_time_str, "%H:%M").time()
+            
+            # 開始時間と終了時間をdatetimeオブジェクトに変換
+            start_datetime = datetime.strptime(f"{date} {start_time_str}", "%Y-%m-%d %H:%M")
+            end_datetime = datetime.strptime(f"{date} {end_time_str}", "%Y-%m-%d %H:%M")
+
+            # 時間の逆転チェック
+            if start_datetime >= end_datetime:
+                return jsonify({"success": False, "message": "終了時間は開始時間より後に設定してください。"}), 400
 
             area = ", ".join(areas)  # 選択したエリアをカンマ区切りで保存
 
@@ -231,31 +237,39 @@ def reserve():
             all_areas = {"キヅキ", "オチツキ", "シタシミ", "ニギワイ"}
             new_reservation_areas = set(areas)
 
+            start_time_obj = datetime.strptime(start_time_str, "%H:%M").time()
+            end_time_obj = datetime.strptime(end_time_str, "%H:%M").time()
             # 既存の予約を取得（同じ日付で時間が重なるもの）
             existing_reservations = Reservation.query.filter(
                 and_(
                     Reservation.date == date,
-                    Reservation.start_time < end_time_str,
-                    Reservation.end_time > start_time_str
+                    Reservation.start_time < end_time_obj,
+                    Reservation.end_time > start_time_obj
                 )
             ).all()
 
             for res in existing_reservations:
-                existing_reserved_areas = set(area.strip() for area in res.area.split(","))
+                existing_reserved_areas = set(area.strip() for area in res.area.split(", "))
 
-                # 新しい予約が全体貸切の場合、既存の予約が1つでもあればエラー
+                # 新しい予約が全体貸切の場合
                 if "全体貸切" in areas:
-                    if existing_reserved_areas & all_areas or "全体貸切" in existing_reserved_areas:
-                        return jsonify({"message": f"エラー: {date} の {start_time_str} 〜 {end_time_str} はすでに予約されています。"}), 400
+                    for res in existing_reservations:
+                        existing_reserved_areas = set(area.strip() for area in res.area.split(", "))
 
-                # 既存の予約が全体貸切の場合、新しい予約が個別エリアであってもエラー
-                if "全体貸切" in existing_reserved_areas:
-                    return jsonify({"message": f"エラー: {date} の {start_time_str} 〜 {end_time_str} は貸切予約済みのため、予約できません。"}), 400
+                        # 既存の予約が1つでもあればエラー
+                        if existing_reserved_areas & all_areas or "全体貸切" in existing_reserved_areas:
+                            return jsonify({"message": f"エラー: {date} の {start_time_str} 〜 {end_time_str} はすでに予約されています。"}), 400
 
-                # 個別エリアの重複チェック
-                if existing_reserved_areas & set(areas):
-                    return jsonify({"message": f"エラー: {date} の {start_time_str} 〜 {end_time_str} にすでに予約されているエリアがあります。"}), 400
-        
+                # 既存予約に全体貸切がある場合
+                for res in existing_reservations:
+                    existing_reserved_areas = set(area.strip() for area in res.area.split(", "))
+
+                    if "全体貸切" in existing_reserved_areas:
+                        return jsonify({"message": f"エラー: {date} の {start_time_str} 〜 {end_time_str} は貸切予約済みのため、予約できません。"}), 400
+
+                    # 個別エリアの重複チェック
+                    if existing_reserved_areas & new_reservation_areas:
+                        return jsonify({"message": f"エラー: {date} の {start_time_str} 〜 {end_time_str} にすでに予約されているエリアがあります。"}), 400
 
             # 企業のポイントをCompanyPointsテーブルから取得
             company_record = CompanyPoints.query.filter_by(company=company_name).first()
@@ -285,6 +299,10 @@ def reserve():
                 end_time=end_time_str
             )
             db.session.add(new_reservation)
+
+            # **ポイントの減算処理**
+            if company_record.points < required_points:
+                return jsonify({"success": False, "message": "ポイントが不足しています。予約できません。"}), 400
 
             # **ポイントを減算**
             company_record.points -= required_points

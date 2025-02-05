@@ -111,7 +111,7 @@
                 if (data.success) {
                     alert('ポイントが加算されました');
                     // ポイントリストを更新
-                    fetch('/get_all_company_points')
+                    fetch(`/get_all_company_points?timestamp=${new Date().getTime()}`)
                         .then(response => response.json())
                         .then(data => {
                             const pointsList = document.getElementById('company_points_list');
