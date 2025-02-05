@@ -134,6 +134,7 @@ def delete_reservation(reservation_id):
 def reservations_list():
     date = request.args.get('date')
     range_type = request.args.get('range')
+    reservations = []
 
     today = datetime.today().strftime('%Y-%m-%d')
 
@@ -147,6 +148,22 @@ def reservations_list():
         reservations = Reservation.query.filter(
             and_(Reservation.date >= today, Reservation.date <= end_date)
         ).order_by(Reservation.date, Reservation.start_time).all()
+    elif range_type == 'next_month':
+        today = datetime.now().date()
+    
+        # 翌月の1日と末日を計算
+        first_day_next_month = (today.replace(day=1) + timedelta(days=32)).replace(day=1)
+        last_day_next_month = (first_day_next_month + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+    
+        # クエリ用の日付フォーマットに変換
+        start_date = first_day_next_month.strftime('%Y-%m-%d')
+        end_date = last_day_next_month.strftime('%Y-%m-%d')
+
+        # 翌月の予約データを取得
+        reservations = Reservation.query.filter(
+            and_(Reservation.date >= start_date, Reservation.date <= end_date)
+        ).order_by(Reservation.date, Reservation.start_time).all()
+
     elif date:
         try:
             date = datetime.strptime(date, "%Y-%m-%d").date()  # ✅ ここで型変換をチェック

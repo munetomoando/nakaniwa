@@ -20,6 +20,8 @@
                     <button type="submit" class="btn btn-primary w-100">検索</button>
                     <a href="/reservations_list?range=7days" class="btn btn-secondary w-100">次の7日間</a>
                     <a href="/reservations_list?range=month" class="btn btn-secondary w-100">今月の予約</a>
+                    <a href="/reservations_list?range=next_month" class="btn btn-secondary w-100">翌月の予約</a>
+
                 </div>
             </form>
         </div>
@@ -134,7 +136,7 @@
 
         <div class="card shadow p-4 mt-4">
             <h4 class="fw-bold">予約状況: 
-                {{ selected_date if selected_date else ("次の7日間" if range_type == "7days" else "今月の予約" if range_type == "month" else "日付を選択してください") }}
+                {{ selected_date if selected_date else ("次の7日間" if range_type == "7days" else "今月の予約" if range_type == "month" else "翌月の予約" if range_type == "nezt_month" else"日付を選択してください") }}
             </h4>
             
             {% if selected_date %}
