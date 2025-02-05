@@ -1,9 +1,10 @@
-from flask import Flask, render_template, request, jsonify, redirect, url_for
+from flask import Flask, render_template, request, jsonify, redirect, url_for, Response
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
-from sqlalchemy import and_  
-from datetime import datetime
-from datetime import timedelta
+from sqlalchemy import and_ 
+from datetime import datetime, time, timedelta
+
+import json
 
 app = Flask(__name__)
 app.secret_key = "your_secret_key"  # `flash` を使うための秘密鍵
@@ -54,7 +55,8 @@ def add_points():
         db.session.add(company_record)
     
     db.session.commit()
-    return jsonify({'success': True, 'message': 'ポイントが加算されました'})
+    return Response(json.dumps({"message": "ポイントが加算されました", "success": True}, ensure_ascii=False),
+                    mimetype='application/json')
 
 @app.route('/get_all_company_points')
 def get_all_company_points():
@@ -69,8 +71,6 @@ def get_all_company_points():
             points_data[company] = 0
     return jsonify(points_data)
 
-
-from datetime import datetime
 
 # **日付ごとの予約データを取得**
 @app.route('/reservations_by_date')
@@ -214,6 +214,7 @@ def calculate_points(date, start_time_str, end_time_str, num_areas):
 def reserve():
     if request.method == 'POST':
         try:
+            # 入力データの取得
             company_name = request.form['company']
             name = request.form['name']
             employee_id = request.form['employee_id']
@@ -228,7 +229,9 @@ def reserve():
 
             # **エリア予約の重複チェック**
             all_areas = {"キヅキ", "オチツキ", "シタシミ", "ニギワイ"}
+            new_reservation_areas = set(areas)
 
+            # 既存の予約を取得（同じ日付で時間が重なるもの）
             existing_reservations = Reservation.query.filter(
                 and_(
                     Reservation.date == date,
@@ -238,15 +241,21 @@ def reserve():
             ).all()
 
             for res in existing_reservations:
-                existing_reserved_areas = set(area.strip() for area in res.area.split(", "))
+                existing_reserved_areas = set(area.strip() for area in res.area.split(","))
+
+                # 新しい予約が全体貸切の場合、既存の予約が1つでもあればエラー
                 if "全体貸切" in areas:
-                    if existing_reserved_areas & all_areas:
+                    if existing_reserved_areas & all_areas or "全体貸切" in existing_reserved_areas:
                         return jsonify({"message": f"エラー: {date} の {start_time_str} 〜 {end_time_str} はすでに予約されています。"}), 400
-                else:
-                    if "全体貸切" in existing_reserved_areas:
-                        return jsonify({"message": f"エラー: {date} の {start_time_str} 〜 {end_time_str} は貸切予約済みのため、個別エリアの予約はできません。"}), 400
-                    if existing_reserved_areas & set(areas):
-                        return jsonify({"message": f"エラー: {date} の {start_time_str} 〜 {end_time_str} にすでに予約されているエリアがあります。"}), 400
+
+                # 既存の予約が全体貸切の場合、新しい予約が個別エリアであってもエラー
+                if "全体貸切" in existing_reserved_areas:
+                    return jsonify({"message": f"エラー: {date} の {start_time_str} 〜 {end_time_str} は貸切予約済みのため、予約できません。"}), 400
+
+                # 個別エリアの重複チェック
+                if existing_reserved_areas & set(areas):
+                    return jsonify({"message": f"エラー: {date} の {start_time_str} 〜 {end_time_str} にすでに予約されているエリアがあります。"}), 400
+        
 
             # 企業のポイントをCompanyPointsテーブルから取得
             company_record = CompanyPoints.query.filter_by(company=company_name).first()
@@ -259,9 +268,13 @@ def reserve():
 
             # ポイントが足りない場合はエラー
             if company_record.points < required_points:
-                return jsonify({"message": f"エラー: ポイントが不足しています（必要: {required_points}pt, 保有: {company_record.points}pt）"}), 400
-            
-            # **予約データの保存**
+                return jsonify({
+                    "message": f"エラー: ポイントが不足しています（必要: {required_points}pt, 保有: {company_record.points}pt）"
+                }), 400
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({"success": False, "message": f"サーバーエラーが発生しました: {str(e)}"}), 500
+        try:    # **予約データの保存**
             new_reservation = Reservation(
                 company=company_name,
                 name=name,
@@ -278,20 +291,17 @@ def reserve():
             db.session.commit()
 
             # **予約完了レスポンス**
-            response = {
-                'message': f"予約完了: {date} の {start_time_str} から {end_time_str} まで {area} を予約しました！",
-                'remaining_points': company_record.points
-            }
-            return jsonify(response), 200
+            return jsonify(
+                success=True,
+                message=f"予約完了: {date} の {start_time_str} から {end_time_str} まで {area} を予約しました！",
+                remaining_points=company_record.points
+            )
 
         except Exception as e:
             db.session.rollback()
             return jsonify({"message": f"サーバーエラーが発生しました: {str(e)}"}), 500
 
     return render_template('reservation.html')
-
-
-
 
 
 @app.route('/calculate_points', methods=['GET'])
