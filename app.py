@@ -1,13 +1,12 @@
 from flask import Flask, render_template, request, jsonify, redirect, url_for, Response
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
-from sqlalchemy import and_ 
+from sqlalchemy import and_
 from datetime import datetime, time, timedelta
-
 import json
 
 app = Flask(__name__)
-app.secret_key = "your_secret_key"  # `flash` を使うための秘密鍵
+app.secret_key = "your_secret_key"  # flash用の秘密鍵
 
 # SQLiteデータベースの設定
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///reservations.db'
@@ -16,7 +15,7 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
-# エリアの表示順を定義
+# エリアの表示順（必要に応じて利用）
 area_order = {
     "シタシミ": 1,
     "キヅキ": 2,
@@ -24,19 +23,34 @@ area_order = {
     "オチツキ": 4,
     "全体貸切": 5
 }
+
 # 予約データのテーブル（モデル）
 class Reservation(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     company = db.Column(db.String(50), nullable=False)  # 企業名
-    name = db.Column(db.String(100), nullable=False)  # 氏名
+    name = db.Column(db.String(100), nullable=False)      # 氏名
     employee_id = db.Column(db.String(20), nullable=False)  # 社員番号
-    area = db.Column(db.String(100), nullable=False)  # 予約エリア（複数選択可能）
-    date = db.Column(db.Date, nullable=False)  # ✅ String → Date に変更
+    area = db.Column(db.String(100), nullable=False)        # 予約エリア（複数選択可）
+    date = db.Column(db.Date, nullable=False)               # 日付型
     start_time = db.Column(db.String(5), nullable=False)
     end_time = db.Column(db.String(5), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-# ポイント管理モデル
+    def to_dict(self):
+        """JSONシリアライズ用"""
+        return {
+            "id": self.id,
+            "company": self.company,
+            "name": self.name,
+            "employee_id": self.employee_id,
+            "area": self.area,
+            "date": self.date.strftime("%Y-%m-%d") if self.date else None,
+            "start_time": self.start_time,
+            "end_time": self.end_time,
+            "created_at": self.created_at.strftime("%Y-%m-%d %H:%M:%S") if self.created_at else None
+        }
+
+# 統一したポイント管理モデル（CompanyPointsのみを使用）
 class CompanyPoints(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     company = db.Column(db.String(50), unique=True, nullable=False)  # 企業名
@@ -60,169 +74,114 @@ def add_points():
 
 @app.route('/get_all_company_points')
 def get_all_company_points():
-    # データベースから最新のポイントを取得
+    # 登録済み企業のポイントを取得
     points_data = {}
     companies = ['A社', 'B社', 'C社', 'D社', 'E社', 'F社']
     for company in companies:
-        result = db.session.query(CompanyPoints).filter_by(company=company).first()
-        if result and result.points is not None:
-            points_data[company] = result.points
-        else:
-            points_data[company] = 0
+        result = CompanyPoints.query.filter_by(company=company).first()
+        points_data[company] = result.points if result and result.points is not None else 0
     return jsonify(points_data)
 
+def get_reservations_by_date(date_str):
+    """日付文字列から予約データを取得（SQLAlchemyを使用）"""
+    try:
+        date_obj = datetime.strptime(date_str, "%Y-%m-%d").date()
+    except ValueError:
+        return []
+    reservations = Reservation.query.filter_by(date=date_obj).all()
+    if not reservations:
+        print(f"No reservations found for {date_str}")
+    return [res.to_dict() for res in reservations]
 
-# **日付ごとの予約データを取得**
-@app.route('/reservations_by_date')
-def reservations_by_date():
-    date_str = request.args.get('date')  # 単一の日付 (例: '2025-02-03')
-    start_date_str = request.args.get('start')  # 範囲の開始日 (例: '2025-02-01')
-    end_date_str = request.args.get('end')  # 範囲の終了日 (例: '2025-02-07')
+@app.route("/reservations_by_date", methods=["GET"])
+def get_daily_reservations():
+    date_str = request.args.get("date")
+    if not date_str:
+        return jsonify([])
+    reservations = get_reservations_by_date(date_str)
+    print(f"Fetching reservations for {date_str}: {reservations}")  # デバッグ用
+    return Response(json.dumps(reservations, ensure_ascii=False), mimetype='application/json')
 
-    # 単一の日付が指定された場合
-    if date_str:
-        try:
-            date_obj = datetime.strptime(date_str, '%Y-%m-%d').date()  # 日付をオブジェクトに変換
-        except ValueError:
-            return jsonify([])  # 日付の形式が不正な場合、空リストを返す
-
-        # データベースからその日付の予約を取得
-        reservations = Reservation.query.filter_by(date=date_obj).order_by(Reservation.start_time).all()
-
-    # 日付範囲が指定された場合
-    elif start_date_str and end_date_str:
-        try:
-            start_date_obj = datetime.strptime(start_date_str, '%Y-%m-%d').date()
-            end_date_obj = datetime.strptime(end_date_str, '%Y-%m-%d').date()
-        except ValueError:
-            return jsonify([])
-
-        # データベースから範囲内の予約を取得
-        reservations = Reservation.query.filter(
-            Reservation.date >= start_date_obj,
-            Reservation.date <= end_date_obj
-        ).order_by(Reservation.date, Reservation.start_time).all()
-
-    else:
-        return jsonify([])  # パラメータが指定されていない場合は空リストを返す
-
-    # 取得した予約データをJSON形式で返す
-    reservations_list = [{
-        "company": r.company,
-        "name": r.name,
-        "employee_id": r.employee_id,
-        "area": r.area,
-        "date": r.date.strftime("%Y-%m-%d"),
-        "start_time": r.start_time,
-        "end_time": r.end_time
-    } for r in reservations]
-
-    return jsonify(reservations_list)
-
-# **予約削除機能**
 @app.route('/delete_reservation/<int:reservation_id>', methods=['POST'])
 def delete_reservation(reservation_id):
     reservation = Reservation.query.get(reservation_id)
     if reservation:
         db.session.delete(reservation)
         db.session.commit()
-        return redirect(url_for('reservations_list', date=reservation.date))
+        # 日付は文字列に変換してURLパラメータに渡す
+        return redirect(url_for('reservations_list', date=reservation.date.strftime("%Y-%m-%d")))
     return "エラー: 予約が見つかりませんでした。"
 
-# **特定の日の予約データを表形式で表示（削除ボタン付き）**
 @app.route('/reservations_list', methods=['GET'])
 def reservations_list():
-    date = request.args.get('date')
+    date_param = request.args.get('date')
     range_type = request.args.get('range')
     reservations = []
-
-    today = datetime.today().strftime('%Y-%m-%d')
+    selected_date = None
+    today = datetime.today().date()
 
     if range_type == "7days":
-        end_date = (datetime.today() + timedelta(days=7)).strftime('%Y-%m-%d')
+        end_date = today + timedelta(days=7)
         reservations = Reservation.query.filter(
             and_(Reservation.date >= today, Reservation.date <= end_date)
         ).order_by(Reservation.date, Reservation.start_time).all()
     elif range_type == "month":
-        end_date = (datetime.today().replace(day=1) + timedelta(days=31)).strftime('%Y-%m-%d')
+        # 今月の予約（今日以降）
+        end_date = (today.replace(day=1) + timedelta(days=31))
         reservations = Reservation.query.filter(
-            and_(Reservation.date >= today, Reservation.date <= end_date)
+            and_(Reservation.date >= today, Reservation.date < end_date)
         ).order_by(Reservation.date, Reservation.start_time).all()
     elif range_type == 'next_month':
-        today = datetime.now().date()
-    
         # 翌月の1日と末日を計算
         first_day_next_month = (today.replace(day=1) + timedelta(days=32)).replace(day=1)
         last_day_next_month = (first_day_next_month + timedelta(days=32)).replace(day=1) - timedelta(days=1)
-    
-        # クエリ用の日付フォーマットに変換
-        start_date = first_day_next_month.strftime('%Y-%m-%d')
-        end_date = last_day_next_month.strftime('%Y-%m-%d')
-
-        # 翌月の予約データを取得
         reservations = Reservation.query.filter(
-            and_(Reservation.date >= start_date, Reservation.date <= end_date)
+            and_(Reservation.date >= first_day_next_month, Reservation.date <= last_day_next_month)
         ).order_by(Reservation.date, Reservation.start_time).all()
-
-    elif date:
+    elif date_param:
         try:
-            date = datetime.strptime(date, "%Y-%m-%d").date()  # ✅ ここで型変換をチェック
+            selected_date = datetime.strptime(date_param, "%Y-%m-%d").date()
         except ValueError:
-            date = None
-        reservations = Reservation.query.filter_by(date=date).order_by(Reservation.start_time).all()
+            selected_date = None
+        if selected_date:
+            reservations = Reservation.query.filter_by(date=selected_date).order_by(Reservation.start_time).all()
     else:
         reservations = []
 
-    return render_template('reservations_list.html', reservations=reservations, selected_date=date, range_type=range_type)
+    return render_template('reservations_list.html', reservations=reservations, selected_date=selected_date, range_type=range_type)
 
-# 企業ごとのポイントを管理するテーブル
-class Company(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(50), unique=True, nullable=False)  # 企業名
-    points = db.Column(db.Integer, nullable=False, default=1000)  # 所有ポイント（初期値1000）
+def fetch_company_points(company_name):
+    """指定企業のポイントを取得するヘルパー関数"""
+    company_record = CompanyPoints.query.filter_by(company=company_name).first()
+    return company_record.points if company_record else 0
 
-
-# **データベースの初期化**
-def init_db():
-    with app.app_context():
-        db.create_all()
-        print("データベース (reservations.db) が作成されました！")
-
-        # 企業情報を登録
-        if not Company.query.first():  # すでにデータがある場合は追加しない
-            companies = ["A社", "B社", "C社", "D社", "E社", "F社"]
-            for name in companies:
-                company = Company(name=name, points=1000)
-                db.session.add(company)
-            db.session.commit()
-            print("企業情報をデータベースに追加しました！")
-# **毎月1日に企業のポイントをリセット**
 def reset_points():
     with app.app_context():
-        companies = Company.query.all()
+        companies = CompanyPoints.query.all()
         for company in companies:
             company.points = 1000
         db.session.commit()
         print("企業のポイントをリセットしました！")
 
-# **予約時のポイント計算**
 def calculate_points(date, start_time_str, end_time_str, num_areas):
-    # start_time と end_time は文字列として渡されているので変換
+    """
+    予約時間の30分単位でのポイント計算。
+    ピークタイムの場合は単価20、通常は10。
+    """
     start_time = datetime.strptime(start_time_str, "%H:%M").time()
     end_time = datetime.strptime(end_time_str, "%H:%M").time()
 
-    # ✅ date が datetime.date 型ならそのまま weekday() を使用
+    # 日付が文字列の場合も対応
     if isinstance(date, str):
         weekday = datetime.strptime(date, "%Y-%m-%d").weekday()
     else:
         weekday = date.weekday()
 
-    # 30分単位での予約時間の計算
+    # 30分単位の時間差を計算
     duration = (datetime.combine(datetime.today(), end_time) - datetime.combine(datetime.today(), start_time)).total_seconds() / 1800
 
-    # ピーク時間帯の判定
+    # ピーク時間帯の判定（例：月曜午前 or 金曜午後）
     is_peak_time = (weekday == 0 and start_time < time(12, 0)) or (weekday == 4 and end_time > time(13, 0))
-
     cost_per_30min = 20 if is_peak_time else 10
     total_cost = int(duration) * cost_per_30min * num_areas
     return max(total_cost, 0)
@@ -231,104 +190,90 @@ def calculate_points(date, start_time_str, end_time_str, num_areas):
 def reserve():
     if request.method == 'POST':
         try:
-            # 入力データの取得
+            # 入力値の取得と型変換
             company_name = request.form['company']
             name = request.form['name']
             employee_id = request.form['employee_id']
-            areas = request.form.getlist('area')  # 複数選択のエリア
+            areas = request.form.getlist('area')  # 複数エリア選択
             date = datetime.strptime(request.form['date'], "%Y-%m-%d").date()
             start_time_str = request.form['start_time']
             end_time_str = request.form['end_time']
             
-            # 開始時間と終了時間をdatetimeオブジェクトに変換
+            # 時間のチェック
             start_datetime = datetime.strptime(f"{date} {start_time_str}", "%Y-%m-%d %H:%M")
             end_datetime = datetime.strptime(f"{date} {end_time_str}", "%Y-%m-%d %H:%M")
-
-            # 時間の逆転チェック
             if start_datetime >= end_datetime:
                 return jsonify({"success": False, "message": "終了時間は開始時間より後に設定してください。"}), 400
 
-            area = ", ".join(areas)  # 選択したエリアをカンマ区切りで保存
-
-            # **エリア予約の重複チェック**
+            # 選択エリアを文字列に変換
+            area_str = ", ".join(areas)
+            
+            # 重複予約チェック用のセット
             all_areas = {"キヅキ", "オチツキ", "シタシミ", "ニギワイ"}
             new_reservation_areas = set(areas)
 
-            start_time_obj = datetime.strptime(start_time_str, "%H:%M").time()
-            end_time_obj = datetime.strptime(end_time_str, "%H:%M").time()
-            # 既存の予約を取得（同じ日付で時間が重なるもの）
+            # 同じ日付かつ時間が重なる既存予約を取得（文字列同士の比較なのでフォーマットは "HH:MM" で統一すること）
             existing_reservations = Reservation.query.filter(
                 and_(
                     Reservation.date == date,
-                    Reservation.start_time < end_time_obj,
-                    Reservation.end_time > start_time_obj
+                    Reservation.start_time < end_time_str,
+                    Reservation.end_time > start_time_str
                 )
             ).all()
 
-            for res in existing_reservations:
-                existing_reserved_areas = set(area.strip() for area in res.area.split(", "))
-
-                # 新しい予約が全体貸切の場合
-                if "全体貸切" in areas:
-                    for res in existing_reservations:
-                        existing_reserved_areas = set(area.strip() for area in res.area.split(", "))
-
-                        # 既存の予約が1つでもあればエラー
-                        if existing_reserved_areas & all_areas or "全体貸切" in existing_reserved_areas:
-                            return jsonify({"message": f"エラー: {date} の {start_time_str} 〜 {end_time_str} はすでに予約されています。"}), 400
-
-                # 既存予約に全体貸切がある場合
+            # 重複チェック
+            if "全体貸切" in areas:
+                # 全体貸切の場合、既存予約が1件でもあればエラー
                 for res in existing_reservations:
-                    existing_reserved_areas = set(area.strip() for area in res.area.split(", "))
-
+                    existing_reserved_areas = set(a.strip() for a in res.area.split(","))
+                    if existing_reserved_areas & all_areas or "全体貸切" in existing_reserved_areas:
+                        return jsonify({"message": f"エラー: {date} の {start_time_str}〜{end_time_str} はすでに予約されています。"}), 400
+            else:
+                # 個別エリアの場合、既存予約に「全体貸切」または重複エリアがあればエラー
+                for res in existing_reservations:
+                    existing_reserved_areas = set(a.strip() for a in res.area.split(","))
                     if "全体貸切" in existing_reserved_areas:
-                        return jsonify({"message": f"エラー: {date} の {start_time_str} 〜 {end_time_str} は貸切予約済みのため、予約できません。"}), 400
-
-                    # 個別エリアの重複チェック
+                        return jsonify({"message": f"エラー: {date} の {start_time_str}〜{end_time_str} は貸切予約済みのため、予約できません。"}), 400
                     if existing_reserved_areas & new_reservation_areas:
-                        return jsonify({"message": f"エラー: {date} の {start_time_str} 〜 {end_time_str} にすでに予約されているエリアがあります。"}), 400
+                        return jsonify({"message": f"エラー: {date} の {start_time_str}〜{end_time_str} にすでに予約されているエリアがあります。"}), 400
 
-            # 企業のポイントをCompanyPointsテーブルから取得
+            # 企業のポイントを取得
             company_record = CompanyPoints.query.filter_by(company=company_name).first()
             if not company_record:
                 return jsonify({"message": f"エラー: 企業情報が見つかりません（{company_name}）"}), 400
 
-            # **必要ポイントの計算**
+            # 必要ポイントの計算（全体貸切の場合はエリア数を4として計算）
             num_areas = 4 if "全体貸切" in areas else len(areas)
             required_points = calculate_points(date, start_time_str, end_time_str, num_areas)
 
-            # ポイントが足りない場合はエラー
+            # ポイント不足の場合はエラー
             if company_record.points < required_points:
                 return jsonify({
                     "message": f"エラー: ポイントが不足しています（必要: {required_points}pt, 保有: {company_record.points}pt）"
                 }), 400
+
         except Exception as e:
             db.session.rollback()
             return jsonify({"success": False, "message": f"サーバーエラーが発生しました: {str(e)}"}), 500
-        try:    # **予約データの保存**
+
+        try:
+            # 予約データの保存とポイントの減算
             new_reservation = Reservation(
                 company=company_name,
                 name=name,
                 employee_id=employee_id,
-                area=area,
+                area=area_str,
                 date=date,
                 start_time=start_time_str,
                 end_time=end_time_str
             )
             db.session.add(new_reservation)
-
-            # **ポイントの減算処理**
-            if company_record.points < required_points:
-                return jsonify({"success": False, "message": "ポイントが不足しています。予約できません。"}), 400
-
-            # **ポイントを減算**
             company_record.points -= required_points
             db.session.commit()
 
-            # **予約完了レスポンス**
             return jsonify(
                 success=True,
-                message=f"予約完了: {date} の {start_time_str} から {end_time_str} まで {area} を予約しました！",
+                message=f"予約完了: {date} の {start_time_str} から {end_time_str} まで {area_str} を予約しました！",
                 remaining_points=company_record.points
             )
 
@@ -338,7 +283,6 @@ def reserve():
 
     return render_template('reservation.html')
 
-
 @app.route('/calculate_points', methods=['GET'])
 def calculate_reservation_points():
     date = request.args.get('date')
@@ -346,22 +290,17 @@ def calculate_reservation_points():
     end_time = request.args.get('end_time')
     num_areas = request.args.get('num_areas')
 
-    # デバッグログ
     print(f"Received: date={date}, start_time={start_time}, end_time={end_time}, num_areas={num_areas}")
 
-    # 入力値のバリデーション
     if not date or not start_time or not end_time or not num_areas:
         return jsonify({'error': 'Invalid input'}), 400
 
     try:
         num_areas = int(num_areas)
     except ValueError:
-        print("Invalid num_areas")
         return jsonify({'error': 'Invalid num_areas'}), 400
 
-    # 時刻の処理
     try:
-        num_areas = int(num_areas)
         start_hour, start_minute = map(int, start_time.split(':'))
         end_hour, end_minute = map(int, end_time.split(':'))
         duration_minutes = (end_hour * 60 + end_minute) - (start_hour * 60 + start_minute)
@@ -380,31 +319,25 @@ def calculate_reservation_points():
         print(f"Error during calculation: {e}")
         return jsonify({'error': 'Calculation error'}), 500
 
-
-
 @app.route('/get_company_points', methods=['GET'])
 def get_company_points():
     company_name = request.args.get('company')
-
     if not company_name:
         return jsonify({"error": "企業名が指定されていません"}), 400
 
-    company = Company.query.filter_by(name=company_name).first()
-
-    if company:
-        return jsonify({"points": company.points})
+    company_record = CompanyPoints.query.filter_by(company=company_name).first()
+    if company_record:
+        return jsonify({"points": company_record.points})
     else:
         return jsonify({"error": "企業が見つかりません"}), 404
-        
 
 @app.route('/dashboard/<company>')
 def dashboard(company):
     reservations = Reservation.query.filter_by(company=company).all()
-    company_points = get_company_points(company)  # 企業ポイントを取得する関数
-
-    # テンプレートファイル名を動的に選択
+    points = fetch_company_points(company)
+    # 企業ごとにテンプレートを分ける場合
     template_name = f'dashboard-{company}.html'
-    return render_template(template_name, company=company, reservations=reservations, points=company_points)
+    return render_template(template_name, company=company, reservations=reservations, points=points)
 
 @app.route('/cancel_reservation/<int:reservation_id>', methods=['POST'])
 def cancel_reservation(reservation_id):
@@ -413,6 +346,19 @@ def cancel_reservation(reservation_id):
     db.session.commit()
     return redirect(url_for('dashboard', company=reservation.company))
 
+def init_db():
+    with app.app_context():
+        db.create_all()
+        print("データベース (reservations.db) が作成されました！")
+        # 企業情報の初期登録（CompanyPointsテーブル）
+        if not CompanyPoints.query.first():
+            companies = ["A社", "B社", "C社", "D社", "E社", "F社"]
+            for name in companies:
+                cp = CompanyPoints(company=name, points=1000)
+                db.session.add(cp)
+            db.session.commit()
+            print("企業情報をデータベースに追加しました！")
+
 if __name__ == '__main__':
-    init_db()  # アプリ起動時にデータベースを作成
+    init_db()  # アプリ起動時にデータベースを初期化
     app.run(debug=True)

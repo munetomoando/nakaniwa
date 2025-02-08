@@ -1,333 +1,181 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NAKANIWAエリア予約</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    
-    <!-- カスタムスタイル -->
-    <style>
-        body {
-            background-color: #e6f2e6;
-        }
-        .header-image {
-        width: 100%;
-        max-width: 600px; /* 画像の最大幅を設定 */
-        border: 10px solid white; /* 白い枠 */
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* 影をつける */
-        border-radius: 5px; /* 角を少し丸める */
-        transition: transform 0.3s ease; /* ホバー時のアニメーション */
-        }
-        .header-image:hover {
-        transform: translateY(-5px); /* ホバーで少し浮き上がる効果 */
-        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3); /* ホバー時の影を強調 */
-        }
-        .card {
-            background-color: #d4edda;
-            border: 1px solid #c3e6cb;
-        }
-        .btn-primary {
-            background-color: #4caf50;
-            border-color: #4caf50;
-        }
-        .btn-primary:hover {
-            background-color: #45a049;
-            border-color: #45a049;
-        }
-        .form-label {
-            color: #2e7d32;
-        }
-        h1, h5 {
-            color: #2e7d32;
-        }
-    </style>
-    <script>
-        function fetchReservations() {
-            let date = document.getElementById("date").value;
-            if (date) {
-                fetch(`/reservations_by_date?date=${date}&timestamp=${new Date().getTime()}`)
-                .then(response => response.json())
-                .then(data => {
-                    let reservationsDiv = document.getElementById("reservations_list");
-                    reservationsDiv.innerHTML = "<h5 class='fw-bold mt-3'>先に登録された予約一覧</h5>"; 
-
-                    if (data.length === 0) {
-                        reservationsDiv.innerHTML = "<p class='text-muted'>この日の予約はありません。</p>";
-                    } else {
-                        let table = `<table class='table table-striped'>
-                                        <thead class='table-dark'>
-                                            <tr>
-                                                <th>企業</th>
-                                                <th>氏名</th>
-                                                <th>社員番号</th>
-                                                <th>エリア</th>
-                                                <th>開始時刻</th>
-                                                <th>終了時刻</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>`;
-                        data.forEach(reservation => {
-                            table += `<tr>
-                                <td>${reservation.company}</td>
-                                <td>${reservation.name}</td>
-                                <td>${reservation.employee_id}</td>
-                                <td>${reservation.area}</td>
-                                <td>${reservation.start_time}</td>
-                                <td>${reservation.end_time}</td>
-                            </tr>`;
-                        });
-                        table += "</tbody></table>";
-                        reservationsDiv.innerHTML = table;
-                    }
-                })
-                .catch(error => console.error("Error:", error));
-            }
-        }
-
-        function fetchCompanyPoints() {
-            let company = document.getElementById("company").value;
-            if (!company) return;
-
-            fetch(`/get_all_company_points?timestamp=${new Date().getTime()}`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data[company] !== undefined) {
-                        document.getElementById("company_points").innerText = `今月の利用可能ポイント: ${data[company]} pt`;
-                    } else {
-                        document.getElementById("company_points").innerText = "企業情報が見つかりません";
-                    }
-                })
-                .catch(error => console.error("エラー:", error));
-        }
-
-        function updatePoints() {
-    let date = document.getElementById("date").value;
-    let startTime = document.getElementById("start_time").value;
-    let endTime = document.getElementById("end_time").value;
-
-    // 選択したエリアの数を取得
-    let areas = document.querySelectorAll('input[name="area"]:checked');
-    let numAreas = areas.length;
-
-    // 貸切が選択されていた場合、numAreas を 4 にする
-    areas.forEach(area => {
-        if (area.value === "全体貸切") {
-            numAreas = 4;
-        }
-    });
-
-    if (!date || !startTime || !endTime || numAreas === 0) {
-        document.getElementById("points_needed").innerText = "必要ポイント: -";
-        return;
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NAKANIWAエリア予約</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  
+  <!-- カスタムスタイル -->
+  <style>
+    body {
+      background-color: #e6f2e6;
     }
-    
-    // **時間をDateオブジェクトに変換して比較**
-    let startDateTime = new Date(`1970-01-01T${startTime}:00`);
-    let endDateTime = new Date(`1970-01-01T${endTime}:00`);
-
-    if (startDateTime >= endDateTime) {
-    document.getElementById("points_needed").innerText = "必要ポイント: 0 pt";
-    return;
-}   
-    // FlaskのAPIにリクエストを送る
-    fetch(`/calculate_points?date=${date}&start_time=${startTime}&end_time=${endTime}&num_areas=${numAreas}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.points !== undefined) {
-                document.getElementById("points_needed").innerText = `必要ポイント: ${data.points} pt`;
-            } else {
-                document.getElementById("points_needed").innerText = "必要ポイント: 0 pt";
-            }
-        })
-        .catch(error => {
-            console.error("エラー:", error);
-            document.getElementById("points_needed").innerText = "必要ポイント: 0 pt";
-        });
-}
-    </script>
+    .header-image {
+      width: 100%;
+      max-width: 600px;
+      border: 10px solid white;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+      border-radius: 5px;
+      transition: transform 0.3s ease;
+    }
+    .header-image:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+    }
+    .card {
+      background-color: #d4edda;
+      border: 1px solid #c3e6cb;
+      border-radius: 8px;
+    }
+    .btn-primary {
+      background-color: #4caf50;
+      border-color: #4caf50;
+    }
+    .btn-primary:hover {
+      background-color: #45a049;
+      border-color: #45a049;
+    }
+    .form-label, h1, h5 {
+      color: #2e7d32;
+    }
+    /* 予約マトリクスをコンパクトに＆角丸に */
+    .reservation-table {
+      border-collapse: separate;
+      border-spacing: 0;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .reservation-table th,
+    .reservation-table td {
+      padding: 0.27rem;
+      font-size: 0.85rem;
+    }
+    /* ここで各行の下に太い横線を追加 */
+    .reservation-table tbody tr {
+      border-bottom: 2px solid #45a049;
+    }
+    @media (max-width: 576px) {
+      .reservation-table th,
+      .reservation-table td {
+        padding: 0.17rem;
+        font-size: 0.75rem;
+      }
+    }
+  </style>
 </head>
 <body class="bg-light">
-    <div class="container mt-5">
-        <!-- ヘッダー画像 -->
-        <div class="text-center mb-4">
-            <img src="{{ url_for('static', filename='areas.png') }}" alt="NAKANIWAの4エリア" class="header-image">
-        </div>
-        <h1 class="text-center mb-4">NAKANIWAエリア予約</h1>
-
-        <div class="card shadow p-4">
-            <form action="/reserve" method="post">
-                <div class="mb-3">
-                    <label for="company" class="form-label">企業名:</label>
-                    <select name="company" id="company" class="form-select" required onchange="fetchCompanyPoints()">
-                        <option value="">企業を選択</option>
-                        <option value="A社">A社</option>
-                        <option value="B社">B社</option>
-                        <option value="C社">C社</option>
-                        <option value="D社">D社</option>
-                        <option value="E社">E社</option>
-                        <option value="F社">F社</option>
-                    </select>
-                    <p id="company_points" class="fw-bold text-primary mt-2">今月の利用可能ポイント: -</p>
-                </div>
-
-                <div class="mb-3">
-                    <label for="name" class="form-label">氏名:</label>
-                    <input type="text" id="name" name="name" class="form-control" required>
-                </div>
-
-                <div class="mb-3">
-                    <label for="employee_id" class="form-label">社員番号:</label>
-                    <input type="text" id="employee_id" name="employee_id" class="form-control" required>
-                </div>
-                <div class="mb-3">
-                    <label for="date" class="form-label">予約日:</label>
-                    <input type="date" id="date" name="date" class="form-control" required onchange="fetchReservations(); updatePoints();">
-                </div>
-                <div id="reservations_list_container" class="mb-3">
-                    <h6 class="fw-bold mt-3 form-label">先に登録された予約一覧</h6>
-                    <div id="reservations_list"></div>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">エリアを選択:</label><br>
-                    <div class="form-check form-check-inline">
-                        <input type="checkbox" name="area" value="シタシミ" class="form-check-input area-checkbox" onchange="updateSelection()"> シタシミ
-                    </div>
-                    <div class="form-check form-check-inline">
-                        <input type="checkbox" name="area" value="キヅキ" class="form-check-input area-checkbox" onchange="updateSelection()"> キヅキ
-                    </div>
-                    <div class="form-check form-check-inline">
-                        <input type="checkbox" name="area" value="ニギワイ" class="form-check-input area-checkbox" onchange="updateSelection()"> ニギワイ
-                    </div>
-                    <div class="form-check form-check-inline">
-                        <input type="checkbox" name="area" value="オチツキ" class="form-check-input area-checkbox" onchange="updateSelection()"> オチツキ
-                    </div>
-                    <div class="form-check form-check-inline">
-                        <input type="checkbox" name="area" value="全体貸切" class="form-check-input" id="full-rental" onchange="selectFullRental()"> 全体貸切
-                    </div>
-                </div>
-
-                
-                <div class="mb-3">
-                    <label for="start_time" class="form-label">開始時刻:</label>
-                    <select name="start_time" id="start_time" class="form-select" onchange="updatePoints()">
-                        {% for hour in range(8, 20) %}
-                            <option value="{{ hour }}:00">{{ hour }}:00</option>
-                            <option value="{{ hour }}:30">{{ hour }}:30</option>
-                        {% endfor %}
-                    </select>
-                </div>
-
-                <div class="mb-3">
-                    <label for="end_time" class="form-label">終了時刻:</label>
-                    <select name="end_time" id="end_time" class="form-select" onchange="updatePoints()">
-                        {% for hour in range(8, 20) %}
-                            <option value="{{ hour }}:00">{{ hour }}:00</option>
-                            <option value="{{ hour }}:30">{{ hour }}:30</option>
-                        {% endfor %}
-                        <option value="20:00">20:00</option>
-                    </select>
-                </div>
-
-                <p id="points_needed" class="fw-bold text-danger">必要ポイント: -</p>
-
-                <button type="submit" class="btn btn-primary w-100">予約する</button>
-            </form>
-        </div>
+  <div class="container mt-5">
+    <!-- ヘッダー画像 -->
+    <div class="text-center mb-4">
+      <img src="{{ url_for('static', filename='areas.png') }}" alt="NAKANIWAの4エリア" class="header-image">
     </div>
-
-    <script>
-        function updateSelection() {
-            let areaCheckboxes = document.querySelectorAll('.area-checkbox');
-            let fullRental = document.getElementById('full-rental');
-
-            let selectedCount = 0;
-            areaCheckboxes.forEach(box => {
-                if (box.checked) {
-                    selectedCount++;
-                }
-            });
-
-            if (selectedCount === 4) {
-                areaCheckboxes.forEach(box => box.checked = false);
-                fullRental.checked = true;
-            } else {
-                fullRental.checked = false;
-            }
-            updatePoints(); // ここを追加
-        }
-
-        function selectFullRental() {
-            let areaCheckboxes = document.querySelectorAll('.area-checkbox');
-            let fullRental = document.getElementById('full-rental');
-
-            if (fullRental.checked) {
-                areaCheckboxes.forEach(box => box.checked = false);
-            }
-            updatePoints(); // ここを追加
-        }
-    </script>
-    <script>
-        document.querySelector('form[action="/reserve"]').addEventListener('submit', function(event) {
-            event.preventDefault();  // デフォルトのフォーム送信を防止
-            
-            const startTime = document.getElementById('start_time').value;
-            const endTime = document.getElementById('end_time').value;
-
-            // 開始時間と終了時間をDateオブジェクトに変換して比較
-            const startDateTime = new Date(`1970-01-01T${startTime}:00`);
-            const endDateTime = new Date(`1970-01-01T${endTime}:00`);
-
-            // 時間の逆転チェック
-            if (startDateTime >= endDateTime) {
-                alert('終了時間は開始時間より後に設定してください。');
-                return;  // 送信中止
-            }
-            // 現在の企業ポイントを取得
-            const companyPointsText = document.getElementById('company_points').innerText.match(/\d+/);
-            const companyPoints = companyPointsText ? parseInt(companyPointsText[0]) : 0;
+    <h1 class="text-center mb-4">NAKANIWAエリア予約</h1>
+  
+    <div class="card shadow p-4">
+      <!-- フォームに id="reserveForm" を付与 -->
+      <form id="reserveForm" action="/reserve" method="post">
+        <div class="mb-3">
+          <label for="company" class="form-label">企業名:</label>
+          <select name="company" id="company" class="form-select" required onchange="fetchCompanyPoints()">
+            <option value="">企業を選択</option>
+            <option value="A社">A社</option>
+            <option value="B社">B社</option>
+            <option value="C社">C社</option>
+            <option value="D社">D社</option>
+            <option value="E社">E社</option>
+            <option value="F社">F社</option>
+          </select>
+          <p id="company_points" class="fw-bold text-primary mt-2">今月の利用可能ポイント: -</p>
+        </div>
+  
+        <div class="mb-3">
+          <label for="name" class="form-label">氏名:</label>
+          <input type="text" id="name" name="name" class="form-control" required>
+        </div>
+  
+        <div class="mb-3">
+          <label for="employee_id" class="form-label">社員番号:</label>
+          <input type="text" id="employee_id" name="employee_id" class="form-control" required>
+        </div>
+  
+        <div class="mb-3">
+          <label for="date" class="form-label">予約日:</label>
+          <input type="date" id="date" name="date" class="form-control" required onchange="fetchDailyReservations(); checkOverlap();">
+        </div>
         
-            // 必要ポイントを取得
-            const neededPointsText = document.getElementById('points_needed').innerText.match(/\d+/);
-            const neededPoints = neededPointsText ? parseInt(neededPointsText[0]) : 0;
+        <!-- コンパクトな予約マトリクス -->
+        <div class="table-responsive">
+          <table class="table text-center table-sm reservation-table">
+            <thead>
+              <tr class="table-dark">
+                <th>時間</th>
+                <th>シタシミ</th>
+                <th>キヅキ</th>
+                <th>ニギワイ</th>
+                <th>オチツキ</th>
+              </tr>
+            </thead>
+            <tbody id="reservation_table">
+              <!-- JavaScriptで動的に予約状況を挿入 -->
+            </tbody>
+          </table>
+        </div>
         
-            // ポイントが不足している場合は警告を表示して処理を中止
-            if (companyPoints < neededPoints) {
-                alert('ポイントが不足しています。予約できません。');
-                return;  // フォーム送信を中止
-            }
-        
-            // フォームデータの送信
-            const formData = new FormData(this);
-        
-            fetch('/reserve', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-    if (data.success) {
-        // モーダル内のメッセージを更新
-        document.getElementById('successModalMessage').innerText = data.message;
-
-        // モーダルを表示
-        var successModal = new bootstrap.Modal(document.getElementById('successModal'));
-        successModal.show();
-
-        // ポイントを更新
-        document.getElementById('company_points').innerText = `今月の利用可能ポイント: ${data.remaining_points} pt`;
-    } else {
-        alert(data.message);  // エラーの場合は通常のアラートを表示
-    }
-})
-            .catch(error => {
-                console.error('予約エラー:', error);
-                alert('予約中にエラーが発生しました。再度お試しください。');
-            });
-    });
-    </script>       
-    <!-- 予約成功モーダル -->
-<div class="modal fade" id="successModal" tabindex="-1" aria-labelledby="successModalLabel" aria-hidden="true">
+        <div class="mb-3">
+          <label class="form-label">エリアを選択:</label><br>
+          <div class="form-check form-check-inline">
+            <input type="checkbox" name="area" value="シタシミ" class="form-check-input area-checkbox" onchange="updateSelection(); checkOverlap();">
+            <label class="form-check-label">シタシミ</label>
+          </div>
+          <div class="form-check form-check-inline">
+            <input type="checkbox" name="area" value="キヅキ" class="form-check-input area-checkbox" onchange="updateSelection(); checkOverlap();">
+            <label class="form-check-label">キヅキ</label>
+          </div>
+          <div class="form-check form-check-inline">
+            <input type="checkbox" name="area" value="ニギワイ" class="form-check-input area-checkbox" onchange="updateSelection(); checkOverlap();">
+            <label class="form-check-label">ニギワイ</label>
+          </div>
+          <div class="form-check form-check-inline">
+            <input type="checkbox" name="area" value="オチツキ" class="form-check-input area-checkbox" onchange="updateSelection(); checkOverlap();">
+            <label class="form-check-label">オチツキ</label>
+          </div>
+          <div class="form-check form-check-inline">
+            <input type="checkbox" name="area" value="全体貸切" class="form-check-input" id="full-rental" onchange="selectFullRental(); checkOverlap();">
+            <label class="form-check-label">全体貸切</label>
+          </div>
+        </div>
+  
+        <div class="mb-3">
+          <label for="start_time" class="form-label">開始時刻:</label>
+          <select name="start_time" id="start_time" class="form-select" onchange="updatePoints(); checkOverlap();">
+            {% for hour in range(8, 20) %}
+              <option value="{{ hour }}:00">{{ hour }}:00</option>
+              <option value="{{ hour }}:30">{{ hour }}:30</option>
+            {% endfor %}
+          </select>
+        </div>
+  
+        <div class="mb-3">
+          <label for="end_time" class="form-label">終了時刻:</label>
+          <select name="end_time" id="end_time" class="form-select" onchange="updatePoints(); checkOverlap();">
+            {% for hour in range(8, 20) %}
+              <option value="{{ hour }}:00">{{ hour }}:00</option>
+              <option value="{{ hour }}:30">{{ hour }}:30</option>
+            {% endfor %}
+            <option value="20:00">20:00</option>
+          </select>
+        </div>
+  
+        <p id="points_needed" class="fw-bold text-danger">必要ポイント: -</p>
+  
+        <button type="submit" class="btn btn-primary w-100">予約する</button>
+      </form>
+    </div>
+  </div>
+  
+  <!-- 予約成功モーダル（ページ内ポップアップ） -->
+  <div class="modal fade" id="successModal" tabindex="-1" aria-labelledby="successModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content">
         <div class="modal-header bg-success text-white">
@@ -344,9 +192,293 @@
       </div>
     </div>
   </div>
-    <!-- BootstrapのJavaScriptとPopper.jsの読み込み -->
-<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.min.js"></script>
- 
+  
+  <!-- エラーモーダル（重複予約エラー表示用） -->
+  <div class="modal fade" id="errorModal" tabindex="-1" aria-labelledby="errorModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header bg-danger text-white">
+          <h5 class="modal-title" id="errorModalLabel">予約エラー</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="閉じる"></button>
+        </div>
+        <div class="modal-body" id="errorModalMessage">
+          既存の予約と重複しています。予約内容を再確認してください。
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Bootstrap の JavaScript と Popper.js -->
+  <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.min.js"></script>
+  
+  <!-- JavaScriptコード -->
+  <script>
+    // グローバル変数：重複が検出されたかどうか
+    let overlapDetected = false;
+  
+    // DOMContentLoaded 内の初期化
+    document.addEventListener("DOMContentLoaded", function () {
+      // 初期日付設定とマトリクス更新
+      let today = new Date();
+      let dateInput = document.getElementById("date");
+      dateInput.value = formatDate(today);
+      fetchDailyReservations();
+      dateInput.addEventListener("change", function() {
+        fetchDailyReservations();
+        checkOverlap();
+      });
+  
+      // フォームの submit イベントリスナーを設定
+      const reserveForm = document.getElementById("reserveForm");
+      if (reserveForm) {
+        reserveForm.addEventListener("submit", function(event) {
+          event.preventDefault(); // デフォルト送信キャンセル
+  
+          // 最終チェック：重複がある場合は送信中止
+          if (overlapDetected) {
+            showOverlapErrorModal();
+            return;
+          }
+  
+          const startTime = document.getElementById("start_time").value;
+          const endTime = document.getElementById("end_time").value;
+          const startDateTime = new Date(`1970-01-01T${startTime}:00`);
+          const endDateTime = new Date(`1970-01-01T${endTime}:00`);
+          if (startDateTime >= endDateTime) {
+            alert("終了時間は開始時間より後に設定してください。");
+            return;
+          }
+          const companyPointsText = document.getElementById("company_points").innerText.match(/\d+/);
+          const companyPoints = companyPointsText ? parseInt(companyPointsText[0]) : 0;
+          const neededPointsText = document.getElementById("points_needed").innerText.match(/\d+/);
+          const neededPoints = neededPointsText ? parseInt(neededPointsText[0]) : 0;
+          if (companyPoints < neededPoints) {
+            alert("ポイントが不足しています。予約できません。");
+            return;
+          }
+          const formData = new FormData(this);
+          fetch("/reserve", {
+            method: "POST",
+            body: formData
+          })
+          .then(response => response.json())
+          .then(data => {
+            if (data.success) {
+              // 予約成功時：成功モーダル表示
+              document.getElementById("successModalMessage").innerText = data.message;
+              var successModal = new bootstrap.Modal(document.getElementById("successModal"));
+              successModal.show();
+              document.getElementById("company_points").innerText = `今月の利用可能ポイント: ${data.remaining_points} pt`;
+            } else {
+              alert(data.message);
+            }
+          })
+          .catch(error => {
+            console.error("予約エラー:", error);
+            alert("予約中にエラーが発生しました。再度お試しください。");
+          });
+        });
+      }
+  
+      // 各入力項目の変更時に重複チェックを実施
+      document.getElementById("start_time").addEventListener("change", checkOverlap);
+      document.getElementById("end_time").addEventListener("change", checkOverlap);
+      document.getElementById("date").addEventListener("change", checkOverlap);
+      document.querySelectorAll('input[name="area"]').forEach(function(el) {
+        el.addEventListener("change", checkOverlap);
+      });
+    });
+  
+    // 予約データ取得とマトリクス更新
+    function fetchDailyReservations() {
+      let dateInput = document.getElementById("date").value;
+      if (!dateInput) return;
+      console.log("Fetching reservations for:", dateInput);
+      fetch(`/reservations_by_date?date=${dateInput}&timestamp=${new Date().getTime()}`)
+        .then(response => response.json())
+        .then(data => {
+          console.log("Received reservations:", data);
+          updateReservationTable(data);
+        })
+        .catch(error => console.error("Error fetching reservations:", error));
+    }
+  
+    function updateReservationTable(data) {
+      let tableBody = document.getElementById("reservation_table");
+      tableBody.innerHTML = "";
+      let timeSlots = [
+        "08:00", "08:30", "09:00", "09:30",
+        "10:00", "10:30", "11:00", "11:30",
+        "12:00", "12:30", "13:00", "13:30",
+        "14:00", "14:30", "15:00", "15:30",
+        "16:00", "16:30", "17:00", "17:30",
+        "18:00", "18:30", "19:00", "19:30"
+      ];
+      let areaNames = ["シタシミ", "キヅキ", "ニギワイ", "オチツキ"];
+      for (let i = 0; i < timeSlots.length; i++) {
+        let row = `<tr><td class="fw-bold">${timeSlots[i]}</td>`;
+        areaNames.forEach(area => {
+          let isReserved = data.some(res => {
+            let resStartTime = res.start_time;
+            let resEndTime = res.end_time;
+            let areaList = res.area.split(", ");
+            let slotTime = timeSlots[i];
+            // 個別エリア予約、または全体貸切の場合は予約済みとする
+            return isTimeInRange(resStartTime, resEndTime, slotTime) &&
+                   (areaList.includes(area) || areaList.includes("全体貸切"));
+          });
+          let bgColor = isReserved ? getAreaColor(area) : "#ffffff";
+          let textColor = isReserved ? "#ffffff" : "#000000";
+          row += `<td style="background-color: ${bgColor}; color: ${textColor};">${isReserved ? "予約済" : ""}</td>`;
+        });
+        row += "</tr>";
+        tableBody.innerHTML += row;
+      }
+    }
+  
+    function isTimeInRange(start, end, time) {
+      let startTime = convertTimeToMinutes(start);
+      let endTime = convertTimeToMinutes(end);
+      let checkTime = convertTimeToMinutes(time);
+      return startTime <= checkTime && checkTime < endTime;
+    }
+  
+    function convertTimeToMinutes(timeStr) {
+      let [hour, minute] = timeStr.split(":").map(Number);
+      return hour * 60 + minute;
+    }
+  
+    function formatDate(date) {
+      return date.toISOString().split("T")[0];
+    }
+  
+    // エリアごとの色（濃い色）
+    function getAreaColor(area) {
+      switch(area) {
+        case "シタシミ": return "#007bff"; // 濃い青
+        case "キヅキ": return "#dc3545";   // 濃い赤
+        case "ニギワイ": return "#ffc107";  // 濃い黄
+        case "オチツキ": return "#28a745";  // 濃い緑
+        case "全体貸切": return "#17a2b8";  // 濃いシアン
+        default: return "#6c757d";          // 濃いグレー
+      }
+    }
+  
+    function fetchCompanyPoints() {
+      let company = document.getElementById("company").value;
+      if (!company) return;
+      fetch(`/get_all_company_points?timestamp=${new Date().getTime()}`)
+        .then(response => response.json())
+        .then(data => {
+          if (data[company] !== undefined) {
+            document.getElementById("company_points").innerText = `今月の利用可能ポイント: ${data[company]} pt`;
+          } else {
+            document.getElementById("company_points").innerText = "企業情報が見つかりません";
+          }
+        })
+        .catch(error => console.error("エラー:", error));
+    }
+  
+    function updatePoints() {
+      let date = document.getElementById("date").value;
+      let startTime = document.getElementById("start_time").value;
+      let endTime = document.getElementById("end_time").value;
+      let areas = document.querySelectorAll('input[name="area"]:checked');
+      let numAreas = areas.length;
+      areas.forEach(area => {
+        if (area.value === "全体貸切") {
+          numAreas = 4;
+        }
+      });
+      if (!date || !startTime || !endTime || numAreas === 0) {
+        document.getElementById("points_needed").innerText = "必要ポイント: -";
+        return;
+      }
+      let startDateTime = new Date(`1970-01-01T${startTime}:00`);
+      let endDateTime = new Date(`1970-01-01T${endTime}:00`);
+      if (startDateTime >= endDateTime) {
+        document.getElementById("points_needed").innerText = "必要ポイント: 0 pt";
+        return;
+      }
+      fetch(`/calculate_points?date=${date}&start_time=${startTime}&end_time=${endTime}&num_areas=${numAreas}`)
+        .then(response => response.json())
+        .then(data => {
+          if (data.points !== undefined) {
+            document.getElementById("points_needed").innerText = `必要ポイント: ${data.points} pt`;
+          } else {
+            document.getElementById("points_needed").innerText = "必要ポイント: 0 pt";
+          }
+        })
+        .catch(error => {
+          console.error("エラー:", error);
+          document.getElementById("points_needed").innerText = "必要ポイント: 0 pt";
+        });
+    }
+  
+    // 重複チェック：入力された日付、開始・終了時刻、選択エリアと既存予約の重複を確認する
+    function checkOverlap() {
+      let date = document.getElementById("date").value;
+      let startTime = document.getElementById("start_time").value;
+      let endTime = document.getElementById("end_time").value;
+      let areaElements = document.querySelectorAll('input[name="area"]:checked');
+      if (!date || !startTime || !endTime || areaElements.length === 0) {
+        overlapDetected = false;
+        return;
+      }
+      let selectedAreas = [];
+      areaElements.forEach(function(el) {
+        selectedAreas.push(el.value);
+      });
+      // 「全体貸切」が選択されている場合、すべてのエリアとみなす
+      if (selectedAreas.includes("全体貸切")) {
+        selectedAreas = ["シタシミ", "キヅキ", "ニギワイ", "オチツキ"];
+      }
+  
+      function timeToMinutes(t) {
+        let parts = t.split(":");
+        return parseInt(parts[0]) * 60 + parseInt(parts[1]);
+      }
+      let startMin = timeToMinutes(startTime);
+      let endMin = timeToMinutes(endTime);
+  
+      // 指定日付の既存予約を取得
+      fetch(`/reservations_by_date?date=${date}&timestamp=${new Date().getTime()}`)
+        .then(response => response.json())
+        .then(data => {
+          let overlapFound = false;
+          data.forEach(function(reservation) {
+            let resStartMin = timeToMinutes(reservation.start_time);
+            let resEndMin = timeToMinutes(reservation.end_time);
+            // 時間帯が重複するかチェック
+            if (startMin < resEndMin && endMin > resStartMin) {
+              let resAreas = reservation.area.split(", ").map(a => a.trim());
+              // 選択エリアと既存予約エリアの共通部分があれば重複とする
+              let intersection = selectedAreas.filter(area => resAreas.includes(area));
+              if (intersection.length > 0) {
+                overlapFound = true;
+              }
+            }
+          });
+          overlapDetected = overlapFound;
+          if (overlapFound) {
+            showOverlapErrorModal();
+          }
+        })
+        .catch(error => {
+          console.error("Error in checkOverlap:", error);
+          overlapDetected = false;
+        });
+    }
+  
+    // エラーモーダル表示用関数
+    function showOverlapErrorModal() {
+      var errorModal = new bootstrap.Modal(document.getElementById("errorModal"));
+      errorModal.show();
+    }
+  </script>
 </body>
 </html>
