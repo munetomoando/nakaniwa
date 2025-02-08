@@ -15,13 +15,13 @@
       width: 100%;
       max-width: 600px;
       border: 10px solid white;
-      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
       border-radius: 5px;
       transition: transform 0.3s ease;
     }
     .header-image:hover {
       transform: translateY(-5px);
-      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+      box-shadow: 0 8px 16px rgba(0,0,0,0.3);
     }
     .card {
       background-color: #d4edda;
@@ -39,7 +39,7 @@
     .form-label, h1, h5 {
       color: #2e7d32;
     }
-    /* 予約マトリクスをコンパクトに＆角丸に */
+    /* 予約マトリクスのスタイル */
     .reservation-table {
       border-collapse: separate;
       border-spacing: 0;
@@ -48,12 +48,8 @@
     }
     .reservation-table th,
     .reservation-table td {
-      padding: 0.27rem;
+      padding: 0.27rem; /* 約2/3に調整 */
       font-size: 0.85rem;
-    }
-    /* ここで各行の下に太い横線を追加 */
-    .reservation-table tbody tr {
-      border-bottom: 2px solid #45a049;
     }
     @media (max-width: 576px) {
       .reservation-table th,
@@ -62,11 +58,18 @@
         font-size: 0.75rem;
       }
     }
+    /* 横線：時間が ":00" の行は濃い横線、":30" の行は薄い横線 */
+    .reservation-table tbody tr.hour-row {
+      border-bottom: 2px solid #b8e994;
+    }
+    .reservation-table tbody tr.half-hour-row {
+      border-bottom: 2px solid #4caf50;
+    }
   </style>
 </head>
 <body class="bg-light">
   <div class="container mt-5">
-    <!-- ヘッダー画像 -->
+    <!-- ヘッダー画像とタイトル -->
     <div class="text-center mb-4">
       <img src="{{ url_for('static', filename='areas.png') }}" alt="NAKANIWAの4エリア" class="header-image">
     </div>
@@ -75,6 +78,7 @@
     <div class="card shadow p-4">
       <!-- フォームに id="reserveForm" を付与 -->
       <form id="reserveForm" action="/reserve" method="post">
+        <!-- 企業選択 -->
         <div class="mb-3">
           <label for="company" class="form-label">企業名:</label>
           <select name="company" id="company" class="form-select" required onchange="fetchCompanyPoints()">
@@ -89,22 +93,23 @@
           <p id="company_points" class="fw-bold text-primary mt-2">今月の利用可能ポイント: -</p>
         </div>
   
+        <!-- 氏名、社員番号 -->
         <div class="mb-3">
           <label for="name" class="form-label">氏名:</label>
           <input type="text" id="name" name="name" class="form-control" required>
         </div>
-  
         <div class="mb-3">
           <label for="employee_id" class="form-label">社員番号:</label>
           <input type="text" id="employee_id" name="employee_id" class="form-control" required>
         </div>
   
+        <!-- 予約日 -->
         <div class="mb-3">
           <label for="date" class="form-label">予約日:</label>
           <input type="date" id="date" name="date" class="form-control" required onchange="fetchDailyReservations(); checkOverlap();">
         </div>
-        
-        <!-- コンパクトな予約マトリクス -->
+  
+        <!-- 予約マトリクス -->
         <div class="table-responsive">
           <table class="table text-center table-sm reservation-table">
             <thead>
@@ -117,13 +122,15 @@
               </tr>
             </thead>
             <tbody id="reservation_table">
-              <!-- JavaScriptで動的に予約状況を挿入 -->
+              <!-- JavaScript で動的に予約状況を挿入 -->
             </tbody>
           </table>
         </div>
-        
+  
+        <!-- エリア選択 -->
         <div class="mb-3">
           <label class="form-label">エリアを選択:</label><br>
+          <!-- 個別エリアチェックボックス -->
           <div class="form-check form-check-inline">
             <input type="checkbox" name="area" value="シタシミ" class="form-check-input area-checkbox" onchange="updateSelection(); checkOverlap();">
             <label class="form-check-label">シタシミ</label>
@@ -140,12 +147,14 @@
             <input type="checkbox" name="area" value="オチツキ" class="form-check-input area-checkbox" onchange="updateSelection(); checkOverlap();">
             <label class="form-check-label">オチツキ</label>
           </div>
+          <!-- 全体貸切チェックボックス -->
           <div class="form-check form-check-inline">
             <input type="checkbox" name="area" value="全体貸切" class="form-check-input" id="full-rental" onchange="selectFullRental(); checkOverlap();">
             <label class="form-check-label">全体貸切</label>
           </div>
         </div>
   
+        <!-- 開始時刻 -->
         <div class="mb-3">
           <label for="start_time" class="form-label">開始時刻:</label>
           <select name="start_time" id="start_time" class="form-select" onchange="updatePoints(); checkOverlap();">
@@ -156,6 +165,7 @@
           </select>
         </div>
   
+        <!-- 終了時刻 -->
         <div class="mb-3">
           <label for="end_time" class="form-label">終了時刻:</label>
           <select name="end_time" id="end_time" class="form-select" onchange="updatePoints(); checkOverlap();">
@@ -199,13 +209,14 @@
       <div class="modal-content">
         <div class="modal-header bg-danger text-white">
           <h5 class="modal-title" id="errorModalLabel">予約エラー</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="閉じる"></button>
+          <!-- data-bs-dismiss="modal" を設定する -->
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="戻る"></button>
         </div>
         <div class="modal-body" id="errorModalMessage">
           既存の予約と重複しています。予約内容を再確認してください。
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">戻る</button>
         </div>
       </div>
     </div>
@@ -217,12 +228,78 @@
   
   <!-- JavaScriptコード -->
   <script>
-    // グローバル変数：重複が検出されたかどうか
-    let overlapDetected = false;
+    var overlapDetected = false;
+    let overlapCheckTimeout;
   
-    // DOMContentLoaded 内の初期化
+    // デバウンス処理を含む重複チェック関数
+    function checkOverlap() {
+      if (overlapCheckTimeout) {
+        clearTimeout(overlapCheckTimeout);
+      }
+      overlapCheckTimeout = setTimeout(() => {
+        var errorModalEl = document.getElementById("errorModal");
+        // エラーモーダルが表示中なら処理を中断
+        if (errorModalEl.classList.contains('show')) {
+          return;
+        }
+        let date = document.getElementById("date").value;
+        let startTime = document.getElementById("start_time").value;
+        let endTime = document.getElementById("end_time").value;
+        let areaElements = document.querySelectorAll('input[name="area"]:checked');
+        if (!date || !startTime || !endTime || areaElements.length === 0) {
+          overlapDetected = false;
+          return;
+        }
+        let selectedAreas = [];
+        areaElements.forEach(function(el) {
+          selectedAreas.push(el.value);
+        });
+        if (selectedAreas.includes("全体貸切")) {
+          selectedAreas = ["シタシミ", "キヅキ", "ニギワイ", "オチツキ"];
+        }
+        function timeToMinutes(t) {
+          let parts = t.split(":");
+          return parseInt(parts[0]) * 60 + parseInt(parts[1]);
+        }
+        let startMin = timeToMinutes(startTime);
+        let endMin = timeToMinutes(endTime);
+        fetch(`/reservations_by_date?date=${date}&timestamp=${new Date().getTime()}`)
+          .then(response => response.json())
+          .then(data => {
+            let overlapFound = false;
+            data.forEach(function(reservation) {
+              let resStartMin = timeToMinutes(reservation.start_time);
+              let resEndMin = timeToMinutes(reservation.end_time);
+              if (startMin < resEndMin && endMin > resStartMin) {
+                let resAreas = reservation.area.split(", ").map(a => a.trim());
+                let intersection = selectedAreas.filter(area => resAreas.includes(area));
+                if (intersection.length > 0) {
+                  overlapFound = true;
+                }
+              }
+            });
+            overlapDetected = overlapFound;
+            if (overlapFound) {
+              showOverlapErrorModal();
+            }
+          })
+          .catch(error => {
+            console.error("Error in checkOverlap:", error);
+            overlapDetected = false;
+          });
+      }, 500);
+    }
+  
+    // エラーモーダルが閉じられたときに overlapDetected をリセット
+    var errorModalEl = document.getElementById("errorModal");
+    errorModalEl.addEventListener('hidden.bs.modal', function () {
+      overlapDetected = false;
+    });
+  
+    // グローバルスコープに登録（必要な関数）
+    window.selectFullRental = selectFullRental;
+  
     document.addEventListener("DOMContentLoaded", function () {
-      // 初期日付設定とマトリクス更新
       let today = new Date();
       let dateInput = document.getElementById("date");
       dateInput.value = formatDate(today);
@@ -232,18 +309,14 @@
         checkOverlap();
       });
   
-      // フォームの submit イベントリスナーを設定
       const reserveForm = document.getElementById("reserveForm");
       if (reserveForm) {
         reserveForm.addEventListener("submit", function(event) {
-          event.preventDefault(); // デフォルト送信キャンセル
-  
-          // 最終チェック：重複がある場合は送信中止
+          event.preventDefault();
           if (overlapDetected) {
             showOverlapErrorModal();
             return;
           }
-  
           const startTime = document.getElementById("start_time").value;
           const endTime = document.getElementById("end_time").value;
           const startDateTime = new Date(`1970-01-01T${startTime}:00`);
@@ -268,7 +341,6 @@
           .then(response => response.json())
           .then(data => {
             if (data.success) {
-              // 予約成功時：成功モーダル表示
               document.getElementById("successModalMessage").innerText = data.message;
               var successModal = new bootstrap.Modal(document.getElementById("successModal"));
               successModal.show();
@@ -284,7 +356,6 @@
         });
       }
   
-      // 各入力項目の変更時に重複チェックを実施
       document.getElementById("start_time").addEventListener("change", checkOverlap);
       document.getElementById("end_time").addEventListener("change", checkOverlap);
       document.getElementById("date").addEventListener("change", checkOverlap);
@@ -293,7 +364,6 @@
       });
     });
   
-    // 予約データ取得とマトリクス更新
     function fetchDailyReservations() {
       let dateInput = document.getElementById("date").value;
       if (!dateInput) return;
@@ -320,14 +390,14 @@
       ];
       let areaNames = ["シタシミ", "キヅキ", "ニギワイ", "オチツキ"];
       for (let i = 0; i < timeSlots.length; i++) {
-        let row = `<tr><td class="fw-bold">${timeSlots[i]}</td>`;
+        let rowClass = timeSlots[i].endsWith(":00") ? "hour-row" : "half-hour-row";
+        let row = `<tr class="${rowClass}"><td class="fw-bold">${timeSlots[i]}</td>`;
         areaNames.forEach(area => {
           let isReserved = data.some(res => {
             let resStartTime = res.start_time;
             let resEndTime = res.end_time;
             let areaList = res.area.split(", ");
             let slotTime = timeSlots[i];
-            // 個別エリア予約、または全体貸切の場合は予約済みとする
             return isTimeInRange(resStartTime, resEndTime, slotTime) &&
                    (areaList.includes(area) || areaList.includes("全体貸切"));
           });
@@ -356,15 +426,14 @@
       return date.toISOString().split("T")[0];
     }
   
-    // エリアごとの色（濃い色）
     function getAreaColor(area) {
       switch(area) {
-        case "シタシミ": return "#007bff"; // 濃い青
-        case "キヅキ": return "#dc3545";   // 濃い赤
-        case "ニギワイ": return "#ffc107";  // 濃い黄
-        case "オチツキ": return "#28a745";  // 濃い緑
-        case "全体貸切": return "#17a2b8";  // 濃いシアン
-        default: return "#6c757d";          // 濃いグレー
+        case "シタシミ": return "#007bff";
+        case "キヅキ": return "#dc3545";
+        case "ニギワイ": return "#ffc107";
+        case "オチツキ": return "#28a745";
+        case "全体貸切": return "#17a2b8";
+        default: return "#6c757d";
       }
     }
   
@@ -419,65 +488,100 @@
         });
     }
   
-    // 重複チェック：入力された日付、開始・終了時刻、選択エリアと既存予約の重複を確認する
-    function checkOverlap() {
-      let date = document.getElementById("date").value;
-      let startTime = document.getElementById("start_time").value;
-      let endTime = document.getElementById("end_time").value;
-      let areaElements = document.querySelectorAll('input[name="area"]:checked');
-      if (!date || !startTime || !endTime || areaElements.length === 0) {
-        overlapDetected = false;
-        return;
+    function updateSelection() {
+      let areaCheckboxes = document.querySelectorAll('.area-checkbox');
+      let fullRental = document.getElementById('full-rental');
+      if (fullRental.checked) {
+        fullRental.checked = false;
       }
-      let selectedAreas = [];
-      areaElements.forEach(function(el) {
-        selectedAreas.push(el.value);
+      let selectedCount = 0;
+      areaCheckboxes.forEach(box => {
+        if (box.checked) {
+          selectedCount++;
+        }
       });
-      // 「全体貸切」が選択されている場合、すべてのエリアとみなす
-      if (selectedAreas.includes("全体貸切")) {
-        selectedAreas = ["シタシミ", "キヅキ", "ニギワイ", "オチツキ"];
+      if (selectedCount === areaCheckboxes.length) {
+        areaCheckboxes.forEach(box => box.checked = false);
+        fullRental.checked = true;
       }
-  
-      function timeToMinutes(t) {
-        let parts = t.split(":");
-        return parseInt(parts[0]) * 60 + parseInt(parts[1]);
-      }
-      let startMin = timeToMinutes(startTime);
-      let endMin = timeToMinutes(endTime);
-  
-      // 指定日付の既存予約を取得
-      fetch(`/reservations_by_date?date=${date}&timestamp=${new Date().getTime()}`)
-        .then(response => response.json())
-        .then(data => {
-          let overlapFound = false;
-          data.forEach(function(reservation) {
-            let resStartMin = timeToMinutes(reservation.start_time);
-            let resEndMin = timeToMinutes(reservation.end_time);
-            // 時間帯が重複するかチェック
-            if (startMin < resEndMin && endMin > resStartMin) {
-              let resAreas = reservation.area.split(", ").map(a => a.trim());
-              // 選択エリアと既存予約エリアの共通部分があれば重複とする
-              let intersection = selectedAreas.filter(area => resAreas.includes(area));
-              if (intersection.length > 0) {
-                overlapFound = true;
-              }
-            }
-          });
-          overlapDetected = overlapFound;
-          if (overlapFound) {
-            showOverlapErrorModal();
-          }
-        })
-        .catch(error => {
-          console.error("Error in checkOverlap:", error);
-          overlapDetected = false;
-        });
+      updatePoints();
     }
   
-    // エラーモーダル表示用関数
+    function selectFullRental() {
+      let areaCheckboxes = document.querySelectorAll('.area-checkbox');
+      let fullRental = document.getElementById('full-rental');
+      if (fullRental.checked) {
+        areaCheckboxes.forEach(box => box.checked = false);
+      }
+      updatePoints();
+    }
+    
+    window.selectFullRental = selectFullRental;
+  
+    function checkOverlap() {
+      if (overlapCheckTimeout) {
+        clearTimeout(overlapCheckTimeout);
+      }
+      overlapCheckTimeout = setTimeout(() => {
+        var errorModalEl = document.getElementById("errorModal");
+        if (errorModalEl.classList.contains('show')) {
+          return;
+        }
+        let date = document.getElementById("date").value;
+        let startTime = document.getElementById("start_time").value;
+        let endTime = document.getElementById("end_time").value;
+        let areaElements = document.querySelectorAll('input[name="area"]:checked');
+        if (!date || !startTime || !endTime || areaElements.length === 0) {
+          overlapDetected = false;
+          return;
+        }
+        let selectedAreas = [];
+        areaElements.forEach(function(el) {
+          selectedAreas.push(el.value);
+        });
+        if (selectedAreas.includes("全体貸切")) {
+          selectedAreas = ["シタシミ", "キヅキ", "ニギワイ", "オチツキ"];
+        }
+        function timeToMinutes(t) {
+          let parts = t.split(":");
+          return parseInt(parts[0]) * 60 + parseInt(parts[1]);
+        }
+        let startMin = timeToMinutes(startTime);
+        let endMin = timeToMinutes(endTime);
+        fetch(`/reservations_by_date?date=${date}&timestamp=${new Date().getTime()}`)
+          .then(response => response.json())
+          .then(data => {
+            let overlapFound = false;
+            data.forEach(function(reservation) {
+              let resStartMin = timeToMinutes(reservation.start_time);
+              let resEndMin = timeToMinutes(reservation.end_time);
+              if (startMin < resEndMin && endMin > resStartMin) {
+                let resAreas = reservation.area.split(", ").map(a => a.trim());
+                let intersection = selectedAreas.filter(area => resAreas.includes(area));
+                if (intersection.length > 0) {
+                  overlapFound = true;
+                }
+              }
+            });
+            overlapDetected = overlapFound;
+            if (overlapFound) {
+              showOverlapErrorModal();
+            }
+          })
+          .catch(error => {
+            console.error("Error in checkOverlap:", error);
+            overlapDetected = false;
+          });
+      }, 500);
+    }
+  
     function showOverlapErrorModal() {
       var errorModal = new bootstrap.Modal(document.getElementById("errorModal"));
       errorModal.show();
+    }
+  
+    function formatDate(date) {
+      return date.toISOString().split("T")[0];
     }
   </script>
 </body>

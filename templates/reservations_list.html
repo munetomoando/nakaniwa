@@ -40,14 +40,14 @@
     <script>
       document.addEventListener('DOMContentLoaded', function() {
         var calendarEl = document.getElementById('calendar');
-
+    
         var calendar = new FullCalendar.Calendar(calendarEl, {
           initialView: 'dayGridMonth',  // 月表示
           locale: 'ja',  // 日本語設定
           headerToolbar: {
             left: 'prev,next today',
             center: 'title',
-            right: 'dayGridMonth,timeGridWeek,timeGridDay'
+            right: 'dayGridMonth,timeGridWeek,timeGridDay'  // 月/週/日 表示切替
           },
           events: function(fetchInfo, successCallback, failureCallback) {
             // fetchInfo.start/end は ISO8601 形式の文字列
@@ -83,13 +83,13 @@
               });
           }
         });
-
+    
         calendar.render();
       });
-
+    
       // エリアごとの色分け設定
       function getAreaColor(area) {
-        // 複数エリアの場合は、エリア名に応じた色を返す（「, 」区切りの場合は先頭のエリアで判定）
+        // 複数エリアの場合は、エリア名に応じた色を返す（先頭のエリアで判定）
         let areas = area.split(/,\s*/);
         let primary = areas[0];
         switch(primary) {
@@ -143,7 +143,8 @@
             </tr>
           </thead>
           <tbody>
-            {% for reservation in reservations %}
+            {# 予約リストを開始時刻順でソートした後、予約日でソート（安定ソートのため、まず開始時刻、次に予約日でソート） #}
+            {% for reservation in reservations|sort(attribute='start_time')|sort(attribute='date') %}
             <tr class="{% if 'キヅキ' in reservation.area %}table-danger{% elif 'オチツキ' in reservation.area %}table-success{% elif 'シタシミ' in reservation.area %}table-primary{% elif 'ニギワイ' in reservation.area %}table-warning{% elif '全体貸切' in reservation.area %}table-info{% endif %}">
               <td>{{ reservation.date }}</td>
               <td>
@@ -170,15 +171,13 @@
         <p class="text-muted">この期間に予約はありません。</p>
       {% endif %}
     </div>
-
-    <!-- ホーム・予約ページ・企業ポイント管理へのリンク -->
+        
     <div class="text-center mt-4">
       <a href="/reserve" class="btn btn-primary rounded-pill px-5 py-3 fw-bold" style="font-size: 1.2rem;">
         予約ページに戻る
       </a>
     </div>
-
-    <!-- 企業ポイント管理エリア -->
+        
     <div class="container mt-4">
       <h2 class="text-center mb-4">企業ポイント管理</h2>
       <!-- 企業ポイント加算フォーム -->
@@ -229,11 +228,11 @@
       <a href="/reserve" class="btn btn-outline-secondary">ホームへ戻る</a>
     </div>
   </div>
-
+  
   <!-- Bootstrap の JavaScript と Popper.js の読み込み -->
   <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.min.js"></script>
-
+  
   <!-- 企業ポイント取得・更新用スクリプト -->
   <script>
     document.addEventListener('DOMContentLoaded', function() {
@@ -252,38 +251,38 @@
           });
         })
         .catch(error => console.error('ポイント取得エラー:', error));
-    });
-
-    document.querySelector('form[action="/add_points"]').addEventListener('submit', function(event) {
-      event.preventDefault();
-      fetch('/add_points', {
-        method: 'POST',
-        body: new FormData(this)
-      })
-      .then(response => response.json())
-      .then(data => {
-        if (data.success) {
-          alert('ポイントが加算されました');
-          // ポイントリストの再更新
-          fetch(`/get_all_company_points?timestamp=${new Date().getTime()}`)
-            .then(response => response.json())
-            .then(data => {
-              const pointsList = document.getElementById('company_points_list');
-              pointsList.innerHTML = '';
-              const companies = ['A社', 'B社', 'C社', 'D社', 'E社', 'F社'];
-              companies.forEach(company => {
-                const points = data[company] !== undefined ? data[company] : 0;
-                const listItem = document.createElement('li');
-                listItem.className = 'list-group-item d-flex justify-content-between align-items-center';
-                listItem.innerHTML = `${company} <span class="badge bg-primary rounded-pill">${points} pt</span>`;
-                pointsList.appendChild(listItem);
+  
+      document.querySelector('form[action="/add_points"]').addEventListener('submit', function(event) {
+        event.preventDefault();
+        fetch('/add_points', {
+          method: 'POST',
+          body: new FormData(this)
+        })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            alert('ポイントが加算されました');
+            // ポイントリストの再更新
+            fetch(`/get_all_company_points?timestamp=${new Date().getTime()}`)
+              .then(response => response.json())
+              .then(data => {
+                const pointsList = document.getElementById('company_points_list');
+                pointsList.innerHTML = '';
+                const companies = ['A社', 'B社', 'C社', 'D社', 'E社', 'F社'];
+                companies.forEach(company => {
+                  const points = data[company] !== undefined ? data[company] : 0;
+                  const listItem = document.createElement('li');
+                  listItem.className = 'list-group-item d-flex justify-content-between align-items-center';
+                  listItem.innerHTML = `${company} <span class="badge bg-primary rounded-pill">${points} pt</span>`;
+                  pointsList.appendChild(listItem);
+                });
               });
-            });
-        } else {
-          alert('ポイント加算に失敗しました');
-        }
-      })
-      .catch(error => console.error('ポイント加算エラー:', error));
+          } else {
+            alert('ポイント加算に失敗しました');
+          }
+        })
+        .catch(error => console.error('ポイント加算エラー:', error));
+      });
     });
   </script>
 </body>
