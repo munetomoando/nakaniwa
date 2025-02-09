@@ -130,7 +130,8 @@
             </tr>
           </thead>
           <tbody>
-            {% for reservation in reservations|sort(attribute='date')|sort(attribute='start_time') %}
+            {# 安定ソートのため、まず開始時刻でソートし、その後予約日でソート #}
+            {% for reservation in reservations|sort(attribute='start_time')|sort(attribute='date') %}
             <tr class="{% if 'キヅキ' in reservation.area %}table-danger{% elif 'オチツキ' in reservation.area %}table-success{% elif 'シタシミ' in reservation.area %}table-primary{% elif 'ニギワイ' in reservation.area %}table-warning{% elif '全体貸切' in reservation.area %}table-info{% endif %}">
               <td>{{ reservation.date }}</td>
               <td>
