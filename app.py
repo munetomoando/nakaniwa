@@ -147,7 +147,18 @@ def reservations_list():
             selected_date = None
         if selected_date:
             reservations = Reservation.query.filter_by(date=selected_date).order_by(Reservation.start_time).all()
-    return render_template('reservations_list.html', reservations=reservations, selected_date=selected_date, range_type=range_type)
+
+    # 企業ポイント情報を取得してテンプレートに渡す
+    companies = ['A社', 'B社', 'C社', 'D社', 'E社', 'F社']
+    company_points = {company: fetch_company_points(company) for company in companies}
+
+    return render_template(
+        'reservations_list.html',
+        reservations=reservations,
+        selected_date=selected_date,
+        range_type=range_type,
+        company_points=company_points
+    )
 
 def fetch_company_points(company_name):
     company_record = CompanyPoints.query.filter_by(company=company_name).first()

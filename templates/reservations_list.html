@@ -215,9 +215,13 @@
           </div>
         </form>
       </div>
+      <!-- ここでサーバーから渡された company_points を利用して現在のポイントを表示 -->
       <div class="card shadow p-4">
         <h4 class="fw-bold">現在の企業ポイント</h4>
         <ul id="company_points_list" class="list-group mt-3">
+          {% for company, points in company_points.items() %}
+            <li class="list-group-item">{{ company }}: {{ points }} pt</li>
+          {% endfor %}
         </ul>
       </div>
     </div>
@@ -465,21 +469,6 @@
         case "全体貸切": return "#17a2b8";
         default: return "#6c757d";
       }
-    }
-  
-    function fetchCompanyPoints() {
-      let company = document.getElementById("company").value;
-      if (!company) return;
-      fetch(`/get_all_company_points?timestamp=${new Date().getTime()}`)
-        .then(response => response.json())
-        .then(data => {
-          if (data[company] !== undefined) {
-            document.getElementById("company_points").innerText = `今月の利用可能ポイント: ${data[company]} pt`;
-          } else {
-            document.getElementById("company_points").innerText = "企業情報が見つかりません";
-          }
-        })
-        .catch(error => console.error("エラー:", error));
     }
   
     function updatePoints() {
