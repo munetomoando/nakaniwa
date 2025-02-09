@@ -5,18 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>予約一覧</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  <!-- FullCalendar のCSS -->
   <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/main.min.css" rel="stylesheet">
   <style>
-    body {
-      background-color: #e6f2e6;
-    }
+    body { background-color: #e6f2e6; }
   </style>
 </head>
 <body class="bg-light">
   <div class="container mt-5">
     <h1 class="text-center mb-4">予約一覧</h1>
-
     <!-- 検索フォーム -->
     <div class="card shadow p-4 mb-4">
       <form method="get" action="/reservations_list">
@@ -32,29 +28,24 @@
         </div>
       </form>
     </div>
-
     <!-- カレンダー表示 -->
     <div id="calendar" class="mb-4"></div>
-
     <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/main.min.js"></script>
     <script>
       document.addEventListener('DOMContentLoaded', function() {
         var calendarEl = document.getElementById('calendar');
-    
         var calendar = new FullCalendar.Calendar(calendarEl, {
-          initialView: 'dayGridMonth',  // 月表示
-          locale: 'ja',  // 日本語設定
+          initialView: 'dayGridMonth',
+          locale: 'ja',
           headerToolbar: {
             left: 'prev,next today',
             center: 'title',
-            right: 'dayGridMonth,timeGridWeek,timeGridDay'  // 月/週/日 表示切替
+            right: 'dayGridMonth,timeGridWeek,timeGridDay'
           },
           events: function(fetchInfo, successCallback, failureCallback) {
-            // fetchInfo.start/end は ISO8601 形式の文字列
             let startDate = new Date(fetchInfo.start);
             let endDate = new Date(fetchInfo.end);
             let promises = [];
-            // 日ごとに予約データを取得
             for (let d = new Date(startDate); d < endDate; d.setDate(d.getDate() + 1)) {
               let dateStr = d.toISOString().split("T")[0];
               promises.push(
@@ -83,30 +74,25 @@
               });
           }
         });
-    
         calendar.render();
       });
-    
-      // エリアごとの色分け設定
       function getAreaColor(area) {
-        // 複数エリアの場合は、エリア名に応じた色を返す（先頭のエリアで判定）
         let areas = area.split(/,\s*/);
         let primary = areas[0];
         switch(primary) {
-          case 'キヅキ': return '#f8d7da';  // 赤系
-          case 'オチツキ': return '#d4edda';  // 緑系
-          case 'シタシミ': return '#cce5ff';  // 青系
-          case 'ニギワイ': return '#fff3cd';  // 黄系
-          case '全体貸切': return '#d1ecf1';  // 水色系（全体貸切）
-          default: return '#e2e3e5';          // グレー
+          case 'キヅキ': return '#f8d7da';
+          case 'オチツキ': return '#d4edda';
+          case 'シタシミ': return '#cce5ff';
+          case 'ニギワイ': return '#fff3cd';
+          case '全体貸切': return '#d1ecf1';
+          default: return '#e2e3e5';
         }
       }
     </script>
-
     <!-- 予約状況一覧（テーブル） -->
     <div class="card shadow p-4 mt-4">
       <h4 class="fw-bold">
-        予約状況: 
+        予約状況:
         {% if selected_date %}
           {{ selected_date }}
         {% else %}
@@ -121,11 +107,9 @@
           {% endif %}
         {% endif %}
       </h4>
-      
       {% if selected_date %}
         <p>選択された日付: {{ selected_date }}</p>
       {% endif %}
-      
       {% if reservations %}
       <div class="table-responsive">
         <table class="table table-striped table-hover table-bordered mt-3">
@@ -139,11 +123,11 @@
               <th>エリア名</th>
               <th>開始時刻</th>
               <th>終了時刻</th>
+              <th>ケータリング</th>
               <th>操作</th>
             </tr>
           </thead>
           <tbody>
-            {# 予約リストを開始時刻順でソートした後、予約日でソート（安定ソートのため、まず開始時刻、次に予約日でソート） #}
             {% for reservation in reservations|sort(attribute='start_time')|sort(attribute='date') %}
             <tr class="{% if 'キヅキ' in reservation.area %}table-danger{% elif 'オチツキ' in reservation.area %}table-success{% elif 'シタシミ' in reservation.area %}table-primary{% elif 'ニギワイ' in reservation.area %}table-warning{% elif '全体貸切' in reservation.area %}table-info{% endif %}">
               <td>{{ reservation.date }}</td>
@@ -157,6 +141,23 @@
               <td>{{ reservation.area if reservation.area else "未設定" }}</td>
               <td>{{ reservation.start_time }}</td>
               <td>{{ reservation.end_time }}</td>
+              <td>
+                {% if reservation.catering_course %}
+                  ○ ({{ reservation.catering_course }}円コース × {{ reservation.catering_people }})<br>
+                  ビール: {{ reservation.beer_count|default(0, true)|int }}本 ({{ reservation.beer_count|default(0, true)|int * 250 }}円)<br>
+                  {% set sparkling = reservation.wine_sparkling|default(0, true)|int %}
+                  {% set white = reservation.wine_white|default(0, true)|int %}
+                  {% set red = reservation.wine_red|default(0, true)|int %}
+                  {% set wine_total = sparkling + white + red %}
+                  ワイン: スパークリング: {{ sparkling }}本, 白: {{ white }}本, 赤: {{ red }}本 ({{ wine_total * 2000 }}円)<br>
+                  {% set catering_total = (reservation.catering_course|int * reservation.catering_people|int)
+                      + (reservation.beer_count|default(0, true)|int * 250)
+                      + (wine_total * 2000) %}
+                  総額: {{ catering_total }}円
+                {% else %}
+                  -
+                {% endif %}
+              </td>
               <td>
                 <form action="{{ url_for('delete_reservation', reservation_id=reservation.id) }}" method="post">
                   <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('本当に削除しますか？');">削除</button>
@@ -180,7 +181,6 @@
         
     <div class="container mt-4">
       <h2 class="text-center mb-4">企業ポイント管理</h2>
-      <!-- 企業ポイント加算フォーム -->
       <div class="card shadow p-4 mb-4">
         <form action="/add_points" method="post" class="row g-3">
           <div class="col-md-4">
@@ -215,75 +215,331 @@
           </div>
         </form>
       </div>
-      <!-- 現在の企業ポイント表示 -->
       <div class="card shadow p-4">
         <h4 class="fw-bold">現在の企業ポイント</h4>
         <ul id="company_points_list" class="list-group mt-3">
-          <!-- JavaScriptで動的にポイントを表示 -->
         </ul>
       </div>
     </div>
-
     <div class="text-center mt-4">
       <a href="/reserve" class="btn btn-outline-secondary">ホームへ戻る</a>
     </div>
   </div>
   
-  <!-- Bootstrap の JavaScript と Popper.js の読み込み -->
   <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.min.js"></script>
   
-  <!-- 企業ポイント取得・更新用スクリプト -->
   <script>
-    document.addEventListener('DOMContentLoaded', function() {
+    var overlapDetected = false;
+    let overlapCheckTimeout;
+  
+    function checkOverlap() {
+      if (overlapCheckTimeout) clearTimeout(overlapCheckTimeout);
+      overlapCheckTimeout = setTimeout(() => {
+        var errorModalEl = document.getElementById("errorModal");
+        if (errorModalEl.classList.contains('show')) return;
+  
+        let date = document.getElementById("date").value;
+        let startTime = document.getElementById("start_time").value;
+        let endTime = document.getElementById("end_time").value;
+        let areaElements = document.querySelectorAll('input[name="area"]:checked');
+        if (!date || !startTime || !endTime || areaElements.length === 0) {
+          overlapDetected = false;
+          return;
+        }
+        let selectedAreas = [];
+        areaElements.forEach(function(el) {
+          selectedAreas.push(el.value);
+        });
+        if (selectedAreas.includes("全体貸切")) {
+          selectedAreas = ["シタシミ", "キヅキ", "ニギワイ", "オチツキ"];
+        }
+        function timeToMinutes(t) {
+          let parts = t.split(":");
+          return parseInt(parts[0]) * 60 + parseInt(parts[1]);
+        }
+        let startMin = timeToMinutes(startTime);
+        let endMin = timeToMinutes(endTime);
+        fetch(`/reservations_by_date?date=${date}&timestamp=${new Date().getTime()}`)
+          .then(response => response.json())
+          .then(data => {
+            let overlapFound = false;
+            data.forEach(function(reservation) {
+              let resStartMin = timeToMinutes(reservation.start_time);
+              let resEndMin = timeToMinutes(reservation.end_time);
+              if (startMin < resEndMin && endMin > resStartMin) {
+                let resAreas = reservation.area.split(", ").map(a => a.trim());
+                let intersection = selectedAreas.filter(area => resAreas.includes(area));
+                if (intersection.length > 0) overlapFound = true;
+              }
+            });
+            overlapDetected = overlapFound;
+            if (overlapFound) showOverlapErrorModal();
+          })
+          .catch(error => {
+            console.error("Error in checkOverlap:", error);
+            overlapDetected = false;
+          });
+      }, 500);
+    }
+  
+    document.getElementById("errorModal").addEventListener('hidden.bs.modal', function () {
+      overlapDetected = false;
+    });
+  
+    window.selectFullRental = selectFullRental;
+  
+    document.addEventListener("DOMContentLoaded", function () {
+      let today = new Date();
+      let dateInput = document.getElementById("date");
+      dateInput.value = formatDate(today);
+      fetchDailyReservations();
+      updatePoints();
+      document.getElementById("date").addEventListener("change", function() {
+        fetchDailyReservations();
+        checkOverlap();
+        updateCateringVisibility();
+        updatePoints();
+      });
+      document.getElementById("start_time").addEventListener("change", function() {
+        checkOverlap();
+        updateCateringVisibility();
+        updatePoints();
+      });
+      document.getElementById("end_time").addEventListener("change", function() {
+        checkOverlap();
+        updateCateringVisibility();
+        updateCateringTotal();
+        updatePoints();
+      });
+      document.getElementById("catering_course").addEventListener("change", updateCateringTotal);
+      document.getElementById("catering_people").addEventListener("change", updateCateringTotal);
+      document.getElementById("beer_count").addEventListener("change", updateCateringTotal);
+      document.getElementById("wine_sparkling").addEventListener("change", updateCateringTotal);
+      document.getElementById("wine_white").addEventListener("change", updateCateringTotal);
+      document.getElementById("wine_red").addEventListener("change", updateCateringTotal);
+  
+      const reserveForm = document.getElementById("reserveForm");
+      if (reserveForm) {
+        reserveForm.addEventListener("submit", function(event) {
+          event.preventDefault();
+          if (overlapDetected) {
+            showOverlapErrorModal();
+            return;
+          }
+          const startTime = document.getElementById("start_time").value;
+          const endTime = document.getElementById("end_time").value;
+          const startDateTime = new Date(`1970-01-01T${startTime}:00`);
+          const endDateTime = new Date(`1970-01-01T${endTime}:00`);
+          if (startDateTime >= endDateTime) {
+            alert("終了時間は開始時間より後に設定してください。");
+            return;
+          }
+          const companyPointsText = document.getElementById("company_points").innerText.match(/\d+/);
+          const companyPoints = companyPointsText ? parseInt(companyPointsText[0]) : 0;
+          const neededPointsText = document.getElementById("points_needed").innerText.match(/\d+/);
+          const neededPoints = neededPointsText ? parseInt(neededPointsText[0]) : 0;
+          if (companyPoints < neededPoints) {
+            alert("ポイントが不足しています。予約できません。");
+            return;
+          }
+          const formData = new FormData(this);
+          fetch("/reserve", {
+            method: "POST",
+            body: formData
+          })
+          .then(response => response.json())
+          .then(data => {
+            if (data.success) {
+              document.getElementById("successModalMessage").innerText = data.message;
+              var successModal = new bootstrap.Modal(document.getElementById("successModal"));
+              successModal.show();
+              document.getElementById("company_points").innerText = `今月の利用可能ポイント: ${data.remaining_points} pt`;
+            } else {
+              alert(data.message);
+            }
+          })
+          .catch(error => {
+            console.error("予約エラー:", error);
+            alert("予約中にエラーが発生しました。再度お試しください。");
+          });
+        });
+      }
+    });
+  
+    function updateCateringVisibility() {
+      var cateringSection = document.getElementById("catering_section");
+      var endTime = document.getElementById("end_time").value;
+      if (convertTimeToMinutes(endTime) >= 18 * 60) {
+        cateringSection.style.display = "block";
+        document.getElementById("catering_course").disabled = false;
+        document.getElementById("catering_people").disabled = false;
+      } else {
+        cateringSection.style.display = "none";
+        document.getElementById("catering_course").disabled = true;
+        document.getElementById("catering_people").disabled = true;
+      }
+    }
+  
+    function updateCateringTotal() {
+      var courseSelect = document.getElementById("catering_course");
+      var course = courseSelect.value;
+      var coursePrice = 0;
+      if (course !== "none" && course !== "") {
+        coursePrice = parseInt(course); // 1000 or 2000
+      }
+      var people = parseInt(document.getElementById("catering_people").value) || 0;
+      var beer = parseInt(document.getElementById("beer_count").value) || 0;
+      var wineSparkling = parseInt(document.getElementById("wine_sparkling").value) || 0;
+      var wineWhite = parseInt(document.getElementById("wine_white").value) || 0;
+      var wineRed = parseInt(document.getElementById("wine_red").value) || 0;
+      var wineTotalCount = wineSparkling + wineWhite + wineRed;
+      var total = (coursePrice * people) + (beer * 250) + (wineTotalCount * 2000);
+      document.getElementById("catering_total").innerText = "ケータリング料金総額: " + total + "円";
+    }
+  
+    function convertTimeToMinutes(timeStr) {
+      let parts = timeStr.split(":");
+      return parseInt(parts[0]) * 60 + parseInt(parts[1]);
+    }
+  
+    function fetchDailyReservations() {
+      let dateInput = document.getElementById("date").value;
+      if (!dateInput) return;
+      fetch(`/reservations_by_date?date=${dateInput}&timestamp=${new Date().getTime()}`)
+        .then(response => response.json())
+        .then(data => updateReservationTable(data))
+        .catch(error => console.error("Error fetching reservations:", error));
+    }
+  
+    function updateReservationTable(data) {
+      let tableBody = document.getElementById("reservation_table");
+      tableBody.innerHTML = "";
+      let timeSlots = [
+        "08:00", "08:30", "09:00", "09:30",
+        "10:00", "10:30", "11:00", "11:30",
+        "12:00", "12:30", "13:00", "13:30",
+        "14:00", "14:30", "15:00", "15:30",
+        "16:00", "16:30", "17:00", "17:30",
+        "18:00", "18:30", "19:00", "19:30"
+      ];
+      let areaNames = ["シタシミ", "キヅキ", "ニギワイ", "オチツキ"];
+      for (let i = 0; i < timeSlots.length; i++) {
+        let rowClass = timeSlots[i].endsWith(":00") ? "hour-row" : "half-hour-row";
+        let row = `<tr class="${rowClass}"><td class="fw-bold">${timeSlots[i]}</td>`;
+        areaNames.forEach(area => {
+          let isReserved = data.some(res => {
+            let resStartTime = res.start_time;
+            let resEndTime = res.end_time;
+            let areaList = res.area.split(", ");
+            let slotTime = timeSlots[i];
+            return isTimeInRange(resStartTime, resEndTime, slotTime) &&
+                   (areaList.includes(area) || areaList.includes("全体貸切"));
+          });
+          let bgColor = isReserved ? getAreaColor(area) : "#ffffff";
+          let textColor = isReserved ? "#ffffff" : "#000000";
+          row += `<td style="background-color: ${bgColor}; color: ${textColor};">${isReserved ? "予約済" : ""}</td>`;
+        });
+        row += "</tr>";
+        tableBody.innerHTML += row;
+      }
+    }
+  
+    function isTimeInRange(start, end, time) {
+      let startTime = convertTimeToMinutes(start);
+      let endTime = convertTimeToMinutes(end);
+      let checkTime = convertTimeToMinutes(time);
+      return startTime <= checkTime && checkTime < endTime;
+    }
+  
+    function formatDate(date) {
+      return date.toISOString().split("T")[0];
+    }
+  
+    function getAreaColor(area) {
+      switch(area) {
+        case "シタシミ": return "#007bff";
+        case "キヅキ": return "#dc3545";
+        case "ニギワイ": return "#ffc107";
+        case "オチツキ": return "#28a745";
+        case "全体貸切": return "#17a2b8";
+        default: return "#6c757d";
+      }
+    }
+  
+    function fetchCompanyPoints() {
+      let company = document.getElementById("company").value;
+      if (!company) return;
       fetch(`/get_all_company_points?timestamp=${new Date().getTime()}`)
         .then(response => response.json())
         .then(data => {
-          const pointsList = document.getElementById('company_points_list');
-          pointsList.innerHTML = '';
-          const companies = ['A社', 'B社', 'C社', 'D社', 'E社', 'F社'];
-          companies.forEach(company => {
-            const points = data[company] !== undefined ? data[company] : 0;
-            const listItem = document.createElement('li');
-            listItem.className = 'list-group-item d-flex justify-content-between align-items-center';
-            listItem.innerHTML = `${company} <span class="badge bg-primary rounded-pill">${points} pt</span>`;
-            pointsList.appendChild(listItem);
-          });
-        })
-        .catch(error => console.error('ポイント取得エラー:', error));
-  
-      document.querySelector('form[action="/add_points"]').addEventListener('submit', function(event) {
-        event.preventDefault();
-        fetch('/add_points', {
-          method: 'POST',
-          body: new FormData(this)
-        })
-        .then(response => response.json())
-        .then(data => {
-          if (data.success) {
-            alert('ポイントが加算されました');
-            // ポイントリストの再更新
-            fetch(`/get_all_company_points?timestamp=${new Date().getTime()}`)
-              .then(response => response.json())
-              .then(data => {
-                const pointsList = document.getElementById('company_points_list');
-                pointsList.innerHTML = '';
-                const companies = ['A社', 'B社', 'C社', 'D社', 'E社', 'F社'];
-                companies.forEach(company => {
-                  const points = data[company] !== undefined ? data[company] : 0;
-                  const listItem = document.createElement('li');
-                  listItem.className = 'list-group-item d-flex justify-content-between align-items-center';
-                  listItem.innerHTML = `${company} <span class="badge bg-primary rounded-pill">${points} pt</span>`;
-                  pointsList.appendChild(listItem);
-                });
-              });
+          if (data[company] !== undefined) {
+            document.getElementById("company_points").innerText = `今月の利用可能ポイント: ${data[company]} pt`;
           } else {
-            alert('ポイント加算に失敗しました');
+            document.getElementById("company_points").innerText = "企業情報が見つかりません";
           }
         })
-        .catch(error => console.error('ポイント加算エラー:', error));
+        .catch(error => console.error("エラー:", error));
+    }
+  
+    function updatePoints() {
+      let date = document.getElementById("date").value;
+      let startTime = document.getElementById("start_time").value;
+      let endTime = document.getElementById("end_time").value;
+      let areas = document.querySelectorAll('input[name="area"]:checked');
+      let numAreas = areas.length;
+      areas.forEach(area => {
+        if (area.value === "全体貸切") { numAreas = 4; }
       });
-    });
+      if (!date || !startTime || !endTime || numAreas === 0) {
+        document.getElementById("points_needed").innerText = "必要ポイント: -";
+        return;
+      }
+      let startDateTime = new Date(`1970-01-01T${startTime}:00`);
+      let endDateTime = new Date(`1970-01-01T${endTime}:00`);
+      if (startDateTime >= endDateTime) {
+        document.getElementById("points_needed").innerText = "必要ポイント: 0 pt";
+        return;
+      }
+      fetch(`/calculate_points?date=${date}&start_time=${startTime}&end_time=${endTime}&num_areas=${numAreas}`)
+        .then(response => response.json())
+        .then(data => {
+          if (data.points !== undefined) {
+            document.getElementById("points_needed").innerText = `必要ポイント: ${data.points} pt`;
+          } else {
+            document.getElementById("points_needed").innerText = "必要ポイント: 0 pt";
+          }
+        })
+        .catch(error => {
+          console.error("エラー:", error);
+          document.getElementById("points_needed").innerText = "必要ポイント: 0 pt";
+        });
+    }
+  
+    function updateSelection() {
+      let areaCheckboxes = document.querySelectorAll('.area-checkbox');
+      let fullRental = document.getElementById('full-rental');
+      if (fullRental.checked) { fullRental.checked = false; }
+      let selectedCount = 0;
+      areaCheckboxes.forEach(box => { if (box.checked) { selectedCount++; } });
+      if (selectedCount === areaCheckboxes.length) {
+        areaCheckboxes.forEach(box => box.checked = false);
+        fullRental.checked = true;
+      }
+      updatePoints();
+    }
+  
+    function selectFullRental() {
+      let areaCheckboxes = document.querySelectorAll('.area-checkbox');
+      let fullRental = document.getElementById('full-rental');
+      if (fullRental.checked) { areaCheckboxes.forEach(box => box.checked = false); }
+      updatePoints();
+    }
+  
+    function showOverlapErrorModal() {
+      var errorModal = new bootstrap.Modal(document.getElementById("errorModal"));
+      errorModal.show();
+    }
   </script>
 </body>
 </html>
