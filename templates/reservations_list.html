@@ -12,8 +12,8 @@
 </head>
 <body class="bg-light">
   <div class="container mt-5">
+    <!-- タイトル＆検索フォーム -->
     <h1 class="text-center mb-4">予約一覧</h1>
-    <!-- 検索フォーム -->
     <div class="card shadow p-4 mb-4">
       <form method="get" action="/reservations_list">
         <div class="mb-3">
@@ -28,6 +28,7 @@
         </div>
       </form>
     </div>
+
     <!-- カレンダー表示 -->
     <div id="calendar" class="mb-4"></div>
     <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/main.min.js"></script>
@@ -89,7 +90,8 @@
         }
       }
     </script>
-    <!-- 予約状況一覧（テーブル） -->
+
+    <!-- 予約一覧テーブル -->
     <div class="card shadow p-4 mt-4">
       <h4 class="fw-bold">
         予約状況:
@@ -128,7 +130,7 @@
             </tr>
           </thead>
           <tbody>
-            {% for reservation in reservations|sort(attribute='start_time')|sort(attribute='date') %}
+            {% for reservation in reservations|sort(attribute='date')|sort(attribute='start_time') %}
             <tr class="{% if 'キヅキ' in reservation.area %}table-danger{% elif 'オチツキ' in reservation.area %}table-success{% elif 'シタシミ' in reservation.area %}table-primary{% elif 'ニギワイ' in reservation.area %}table-warning{% elif '全体貸切' in reservation.area %}table-info{% endif %}">
               <td>{{ reservation.date }}</td>
               <td>
@@ -144,14 +146,14 @@
               <td>
                 {% if reservation.catering_course %}
                   ○ ({{ reservation.catering_course }}円コース × {{ reservation.catering_people }})<br>
-                  ビール: {{ reservation.beer_count|default(0, true)|int }}本 ({{ reservation.beer_count|default(0, true)|int * 250 }}円)<br>
-                  {% set sparkling = reservation.wine_sparkling|default(0, true)|int %}
-                  {% set white = reservation.wine_white|default(0, true)|int %}
-                  {% set red = reservation.wine_red|default(0, true)|int %}
+                  ビール: {{ reservation.beer_count|default(0)|int }}本 ({{ reservation.beer_count|default(0)|int * 250 }}円)<br>
+                  {% set sparkling = reservation.wine_sparkling|default(0)|int %}
+                  {% set white = reservation.wine_white|default(0)|int %}
+                  {% set red = reservation.wine_red|default(0)|int %}
                   {% set wine_total = sparkling + white + red %}
                   ワイン: スパークリング: {{ sparkling }}本, 白: {{ white }}本, 赤: {{ red }}本 ({{ wine_total * 2000 }}円)<br>
                   {% set catering_total = (reservation.catering_course|int * reservation.catering_people|int)
-                      + (reservation.beer_count|default(0, true)|int * 250)
+                      + (reservation.beer_count|default(0)|int * 250)
                       + (wine_total * 2000) %}
                   総額: {{ catering_total }}円
                 {% else %}
@@ -172,17 +174,20 @@
         <p class="text-muted">この期間に予約はありません。</p>
       {% endif %}
     </div>
-        
+
+    <!-- ナビゲーションボタン -->
     <div class="text-center mt-4">
       <a href="/reserve" class="btn btn-primary rounded-pill px-5 py-3 fw-bold" style="font-size: 1.2rem;">
         予約ページに戻る
       </a>
     </div>
-        
+
+    <!-- 企業ポイント管理セクション -->
     <div class="container mt-4">
       <h2 class="text-center mb-4">企業ポイント管理</h2>
       <div class="card shadow p-4 mb-4">
-        <form action="/add_points" method="post" class="row g-3">
+        <!-- ポイント加算フォーム（AJAX送信用） -->
+        <form id="addPointsForm" action="/add_points" method="post" class="row g-3">
           <div class="col-md-4">
             <label for="company" class="form-label">企業を選択:</label>
             <select name="company" id="company" class="form-select" required>
@@ -215,7 +220,6 @@
           </div>
         </form>
       </div>
-      <!-- ここでサーバーから渡された company_points を利用して現在のポイントを表示 -->
       <div class="card shadow p-4">
         <h4 class="fw-bold">現在の企業ポイント</h4>
         <ul id="company_points_list" class="list-group mt-3">
@@ -225,27 +229,58 @@
         </ul>
       </div>
     </div>
+
     <div class="text-center mt-4">
       <a href="/reserve" class="btn btn-outline-secondary">ホームへ戻る</a>
     </div>
   </div>
-  
+
+  <!-- 成功時モーダル（予約成功／ポイント加算時に表示） -->
+  <div class="modal fade" id="successModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-body">
+          <p id="successModalMessage"></p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-primary" data-bs-dismiss="modal">OK</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- エラーモーダル（重複チェックなどで使用） -->
+  <div class="modal fade" id="errorModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-body">
+          <p>選択した時間帯は既に予約済みです。</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-danger" data-bs-dismiss="modal">閉じる</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Popper.js と Bootstrap の JS -->
   <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.min.js"></script>
-  
+
   <script>
     var overlapDetected = false;
     let overlapCheckTimeout;
-  
+
+    // 重複チェック
     function checkOverlap() {
       if (overlapCheckTimeout) clearTimeout(overlapCheckTimeout);
       overlapCheckTimeout = setTimeout(() => {
         var errorModalEl = document.getElementById("errorModal");
         if (errorModalEl.classList.contains('show')) return;
-  
+
         let date = document.getElementById("date").value;
-        let startTime = document.getElementById("start_time").value;
-        let endTime = document.getElementById("end_time").value;
+        let startTime = document.getElementById("start_time") ? document.getElementById("start_time").value : "";
+        let endTime = document.getElementById("end_time") ? document.getElementById("end_time").value : "";
         let areaElements = document.querySelectorAll('input[name="area"]:checked');
         if (!date || !startTime || !endTime || areaElements.length === 0) {
           overlapDetected = false;
@@ -286,43 +321,66 @@
           });
       }, 500);
     }
-  
+
+    // エラーモーダルが閉じられたときは重複フラグをリセット
     document.getElementById("errorModal").addEventListener('hidden.bs.modal', function () {
       overlapDetected = false;
     });
-  
+
     window.selectFullRental = selectFullRental;
-  
+
     document.addEventListener("DOMContentLoaded", function () {
       let today = new Date();
       let dateInput = document.getElementById("date");
-      dateInput.value = formatDate(today);
+      if(dateInput) {
+        dateInput.value = formatDate(today);
+      }
       fetchDailyReservations();
       updatePoints();
-      document.getElementById("date").addEventListener("change", function() {
-        fetchDailyReservations();
-        checkOverlap();
-        updateCateringVisibility();
-        updatePoints();
-      });
-      document.getElementById("start_time").addEventListener("change", function() {
-        checkOverlap();
-        updateCateringVisibility();
-        updatePoints();
-      });
-      document.getElementById("end_time").addEventListener("change", function() {
-        checkOverlap();
-        updateCateringVisibility();
-        updateCateringTotal();
-        updatePoints();
-      });
-      document.getElementById("catering_course").addEventListener("change", updateCateringTotal);
-      document.getElementById("catering_people").addEventListener("change", updateCateringTotal);
-      document.getElementById("beer_count").addEventListener("change", updateCateringTotal);
-      document.getElementById("wine_sparkling").addEventListener("change", updateCateringTotal);
-      document.getElementById("wine_white").addEventListener("change", updateCateringTotal);
-      document.getElementById("wine_red").addEventListener("change", updateCateringTotal);
-  
+
+      if(document.getElementById("date")) {
+        document.getElementById("date").addEventListener("change", function() {
+          fetchDailyReservations();
+          checkOverlap();
+          updateCateringVisibility();
+          updatePoints();
+        });
+      }
+      if(document.getElementById("start_time")) {
+        document.getElementById("start_time").addEventListener("change", function() {
+          checkOverlap();
+          updateCateringVisibility();
+          updatePoints();
+        });
+      }
+      if(document.getElementById("end_time")) {
+        document.getElementById("end_time").addEventListener("change", function() {
+          checkOverlap();
+          updateCateringVisibility();
+          updateCateringTotal();
+          updatePoints();
+        });
+      }
+      if(document.getElementById("catering_course")) {
+        document.getElementById("catering_course").addEventListener("change", updateCateringTotal);
+      }
+      if(document.getElementById("catering_people")) {
+        document.getElementById("catering_people").addEventListener("change", updateCateringTotal);
+      }
+      if(document.getElementById("beer_count")) {
+        document.getElementById("beer_count").addEventListener("change", updateCateringTotal);
+      }
+      if(document.getElementById("wine_sparkling")) {
+        document.getElementById("wine_sparkling").addEventListener("change", updateCateringTotal);
+      }
+      if(document.getElementById("wine_white")) {
+        document.getElementById("wine_white").addEventListener("change", updateCateringTotal);
+      }
+      if(document.getElementById("wine_red")) {
+        document.getElementById("wine_red").addEventListener("change", updateCateringTotal);
+      }
+
+      // ※ 予約フォームが存在する場合の処理（reservations_list.html では通常表示されないが、念のため残す）
       const reserveForm = document.getElementById("reserveForm");
       if (reserveForm) {
         reserveForm.addEventListener("submit", function(event) {
@@ -339,9 +397,9 @@
             alert("終了時間は開始時間より後に設定してください。");
             return;
           }
-          const companyPointsText = document.getElementById("company_points").innerText.match(/\d+/);
+          const companyPointsText = document.getElementById("company_points") ? document.getElementById("company_points").innerText.match(/\d+/) : null;
           const companyPoints = companyPointsText ? parseInt(companyPointsText[0]) : 0;
-          const neededPointsText = document.getElementById("points_needed").innerText.match(/\d+/);
+          const neededPointsText = document.getElementById("points_needed") ? document.getElementById("points_needed").innerText.match(/\d+/) : null;
           const neededPoints = neededPointsText ? parseInt(neededPointsText[0]) : 0;
           if (companyPoints < neededPoints) {
             alert("ポイントが不足しています。予約できません。");
@@ -358,7 +416,9 @@
               document.getElementById("successModalMessage").innerText = data.message;
               var successModal = new bootstrap.Modal(document.getElementById("successModal"));
               successModal.show();
-              document.getElementById("company_points").innerText = `今月の利用可能ポイント: ${data.remaining_points} pt`;
+              if(document.getElementById("company_points")) {
+                document.getElementById("company_points").innerText = `今月の利用可能ポイント: ${data.remaining_points} pt`;
+              }
             } else {
               alert(data.message);
             }
@@ -369,55 +429,113 @@
           });
         });
       }
+
+      // ポイント加算フォーム（AJAX送信）
+      const addPointsForm = document.getElementById('addPointsForm');
+      if (addPointsForm) {
+        addPointsForm.addEventListener('submit', function(e) {
+          e.preventDefault(); // 通常の送信をキャンセル
+          const formData = new FormData(addPointsForm);
+          fetch('/add_points', {
+            method: 'POST',
+            body: formData
+          })
+          .then(response => response.json())
+          .then(data => {
+            if (data.success) {
+              // モーダルにメッセージを設定して表示
+              document.getElementById('successModalMessage').innerText = "ポイントが追加されました";
+              var successModal = new bootstrap.Modal(document.getElementById('successModal'));
+              successModal.show();
+              // ポイント一覧を更新
+              updateCompanyPoints();
+            } else {
+              alert(data.message || "ポイント加算に失敗しました");
+            }
+          })
+          .catch(error => {
+            console.error("エラー:", error);
+            alert("ポイント加算中にエラーが発生しました");
+          });
+        });
+      }
     });
-  
+
+    // 最新の企業ポイント情報を取得して更新
+    function updateCompanyPoints() {
+      fetch(`/get_all_company_points?timestamp=${new Date().getTime()}`)
+        .then(response => response.json())
+        .then(data => {
+          const listEl = document.getElementById('company_points_list');
+          listEl.innerHTML = '';
+          for (const [company, points] of Object.entries(data)) {
+            const li = document.createElement('li');
+            li.className = 'list-group-item';
+            li.innerText = `${company}: ${points} pt`;
+            listEl.appendChild(li);
+          }
+        })
+        .catch(error => {
+          console.error("ポイント更新エラー:", error);
+        });
+    }
+
+    // ケータリング表示の切替処理
     function updateCateringVisibility() {
       var cateringSection = document.getElementById("catering_section");
-      var endTime = document.getElementById("end_time").value;
+      var endTime = document.getElementById("end_time") ? document.getElementById("end_time").value : "";
+      if (!endTime) return;
       if (convertTimeToMinutes(endTime) >= 18 * 60) {
-        cateringSection.style.display = "block";
-        document.getElementById("catering_course").disabled = false;
-        document.getElementById("catering_people").disabled = false;
+        if(cateringSection) cateringSection.style.display = "block";
+        if(document.getElementById("catering_course")) document.getElementById("catering_course").disabled = false;
+        if(document.getElementById("catering_people")) document.getElementById("catering_people").disabled = false;
       } else {
-        cateringSection.style.display = "none";
-        document.getElementById("catering_course").disabled = true;
-        document.getElementById("catering_people").disabled = true;
+        if(cateringSection) cateringSection.style.display = "none";
+        if(document.getElementById("catering_course")) document.getElementById("catering_course").disabled = true;
+        if(document.getElementById("catering_people")) document.getElementById("catering_people").disabled = true;
       }
     }
-  
+
+    // ケータリング料金総額の計算
     function updateCateringTotal() {
       var courseSelect = document.getElementById("catering_course");
-      var course = courseSelect.value;
+      var course = courseSelect ? courseSelect.value : "";
       var coursePrice = 0;
       if (course !== "none" && course !== "") {
-        coursePrice = parseInt(course); // 1000 or 2000
+        coursePrice = parseInt(course);
       }
-      var people = parseInt(document.getElementById("catering_people").value) || 0;
-      var beer = parseInt(document.getElementById("beer_count").value) || 0;
-      var wineSparkling = parseInt(document.getElementById("wine_sparkling").value) || 0;
-      var wineWhite = parseInt(document.getElementById("wine_white").value) || 0;
-      var wineRed = parseInt(document.getElementById("wine_red").value) || 0;
+      var people = document.getElementById("catering_people") ? parseInt(document.getElementById("catering_people").value) || 0 : 0;
+      var beer = document.getElementById("beer_count") ? parseInt(document.getElementById("beer_count").value) || 0 : 0;
+      var wineSparkling = document.getElementById("wine_sparkling") ? parseInt(document.getElementById("wine_sparkling").value) || 0 : 0;
+      var wineWhite = document.getElementById("wine_white") ? parseInt(document.getElementById("wine_white").value) || 0 : 0;
+      var wineRed = document.getElementById("wine_red") ? parseInt(document.getElementById("wine_red").value) || 0 : 0;
       var wineTotalCount = wineSparkling + wineWhite + wineRed;
       var total = (coursePrice * people) + (beer * 250) + (wineTotalCount * 2000);
-      document.getElementById("catering_total").innerText = "ケータリング料金総額: " + total + "円";
+      if(document.getElementById("catering_total")) {
+        document.getElementById("catering_total").innerText = "ケータリング料金総額: " + total + "円";
+      }
     }
-  
+
+    // 時刻文字列（HH:MM）を分に変換
     function convertTimeToMinutes(timeStr) {
       let parts = timeStr.split(":");
       return parseInt(parts[0]) * 60 + parseInt(parts[1]);
     }
-  
+
+    // 指定日の予約情報を取得
     function fetchDailyReservations() {
-      let dateInput = document.getElementById("date").value;
+      let dateInput = document.getElementById("date") ? document.getElementById("date").value : "";
       if (!dateInput) return;
       fetch(`/reservations_by_date?date=${dateInput}&timestamp=${new Date().getTime()}`)
         .then(response => response.json())
         .then(data => updateReservationTable(data))
         .catch(error => console.error("Error fetching reservations:", error));
     }
-  
+
+    // 予約一覧テーブルを更新（時間帯×エリアのマトリックス）
     function updateReservationTable(data) {
       let tableBody = document.getElementById("reservation_table");
+      if(!tableBody) return;
       tableBody.innerHTML = "";
       let timeSlots = [
         "08:00", "08:30", "09:00", "09:30",
@@ -448,18 +566,21 @@
         tableBody.innerHTML += row;
       }
     }
-  
+
+    // 指定の時刻が予約時間内にあるか判定
     function isTimeInRange(start, end, time) {
       let startTime = convertTimeToMinutes(start);
       let endTime = convertTimeToMinutes(end);
       let checkTime = convertTimeToMinutes(time);
       return startTime <= checkTime && checkTime < endTime;
     }
-  
+
+    // 日付オブジェクトをYYYY-MM-DD形式の文字列に変換
     function formatDate(date) {
       return date.toISOString().split("T")[0];
     }
-  
+
+    // エリアに応じた色を返す
     function getAreaColor(area) {
       switch(area) {
         case "シタシミ": return "#007bff";
@@ -470,61 +591,72 @@
         default: return "#6c757d";
       }
     }
-  
+
+    // 必要ポイントの計算結果を更新
     function updatePoints() {
-      let date = document.getElementById("date").value;
-      let startTime = document.getElementById("start_time").value;
-      let endTime = document.getElementById("end_time").value;
+      let date = document.getElementById("date") ? document.getElementById("date").value : "";
+      let startTime = document.getElementById("start_time") ? document.getElementById("start_time").value : "";
+      let endTime = document.getElementById("end_time") ? document.getElementById("end_time").value : "";
       let areas = document.querySelectorAll('input[name="area"]:checked');
       let numAreas = areas.length;
       areas.forEach(area => {
         if (area.value === "全体貸切") { numAreas = 4; }
       });
       if (!date || !startTime || !endTime || numAreas === 0) {
-        document.getElementById("points_needed").innerText = "必要ポイント: -";
+        if(document.getElementById("points_needed")) {
+          document.getElementById("points_needed").innerText = "必要ポイント: -";
+        }
         return;
       }
       let startDateTime = new Date(`1970-01-01T${startTime}:00`);
       let endDateTime = new Date(`1970-01-01T${endTime}:00`);
       if (startDateTime >= endDateTime) {
-        document.getElementById("points_needed").innerText = "必要ポイント: 0 pt";
+        if(document.getElementById("points_needed")) {
+          document.getElementById("points_needed").innerText = "必要ポイント: 0 pt";
+        }
         return;
       }
       fetch(`/calculate_points?date=${date}&start_time=${startTime}&end_time=${endTime}&num_areas=${numAreas}`)
         .then(response => response.json())
         .then(data => {
           if (data.points !== undefined) {
-            document.getElementById("points_needed").innerText = `必要ポイント: ${data.points} pt`;
+            if(document.getElementById("points_needed")) {
+              document.getElementById("points_needed").innerText = `必要ポイント: ${data.points} pt`;
+            }
           } else {
-            document.getElementById("points_needed").innerText = "必要ポイント: 0 pt";
+            if(document.getElementById("points_needed")) {
+              document.getElementById("points_needed").innerText = "必要ポイント: 0 pt";
+            }
           }
         })
         .catch(error => {
           console.error("エラー:", error);
-          document.getElementById("points_needed").innerText = "必要ポイント: 0 pt";
+          if(document.getElementById("points_needed")) {
+            document.getElementById("points_needed").innerText = "必要ポイント: 0 pt";
+          }
         });
     }
-  
+
     function updateSelection() {
       let areaCheckboxes = document.querySelectorAll('.area-checkbox');
       let fullRental = document.getElementById('full-rental');
-      if (fullRental.checked) { fullRental.checked = false; }
+      if (fullRental && fullRental.checked) { fullRental.checked = false; }
       let selectedCount = 0;
       areaCheckboxes.forEach(box => { if (box.checked) { selectedCount++; } });
       if (selectedCount === areaCheckboxes.length) {
         areaCheckboxes.forEach(box => box.checked = false);
-        fullRental.checked = true;
+        if(fullRental) fullRental.checked = true;
       }
       updatePoints();
     }
-  
+
     function selectFullRental() {
       let areaCheckboxes = document.querySelectorAll('.area-checkbox');
       let fullRental = document.getElementById('full-rental');
-      if (fullRental.checked) { areaCheckboxes.forEach(box => box.checked = false); }
+      if (fullRental && fullRental.checked) { areaCheckboxes.forEach(box => box.checked = false); }
       updatePoints();
     }
-  
+
     function showOverlapErrorModal() {
       var errorModal = new bootstrap.Modal(document.getElementById("errorModal"));
       errorModal.show();
