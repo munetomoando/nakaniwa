@@ -3,35 +3,67 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>NAKANIWAエリア予約</title>
+  <title>川崎中央商店街振興組合会議室予約サイト</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
-    body { background-color: #e6f2e6; }
+    /* オフィス向けのグレーをベースとした配色 */
+    body { background-color: #f8f9fa; }
     .header-image {
-      width: 100%; max-width: 600px; border: 10px solid white;
-      box-shadow: 0 4px 8px rgba(0,0,0,0.2); border-radius: 5px;
+      width: 100%; 
+      max-width: 600px; 
+      border: 2px solid #ccc;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1); 
+      border-radius: 5px;
       transition: transform 0.3s ease;
     }
-    .header-image:hover { transform: translateY(-5px); box-shadow: 0 8px 16px rgba(0,0,0,0.3); }
-    .card { background-color: #d4edda; border: 1px solid #c3e6cb; border-radius: 8px; }
-    .btn-primary { background-color: #4caf50; border-color: #4caf50; }
-    .btn-primary:hover { background-color: #45a049; border-color: #45a049; }
-    .form-label, h1, h5 { color: #2e7d32; }
-    .reservation-table { border-collapse: separate; border-spacing: 0; border-radius: 8px; overflow: hidden; }
-    .reservation-table th, .reservation-table td { padding: 0.27rem; font-size: 0.85rem; }
-    @media (max-width: 576px) {
-      .reservation-table th, .reservation-table td { padding: 0.17rem; font-size: 0.75rem; }
+    .header-image:hover { 
+      transform: translateY(-3px); 
+      box-shadow: 0 8px 16px rgba(0,0,0,0.15); 
     }
-    .reservation-table tbody tr.hour-row { border-bottom: 2px solid #b8e994; }
-    .reservation-table tbody tr.half-hour-row { border-bottom: 2px solid #4caf50; }
+    .card { 
+      background-color: #ffffff; 
+      border: 1px solid #dee2e6; 
+      border-radius: .25rem; 
+    }
+    .btn-primary { 
+      background-color: #6c757d; 
+      border-color: #6c757d; 
+    }
+    .btn-primary:hover { 
+      background-color: #5a6268; 
+      border-color: #545b62; 
+    }
+    .form-label, h1, h5 { 
+      color: #343a40; 
+    }
+    .reservation-table { 
+      border-collapse: separate; 
+      border-spacing: 0; 
+      border-radius: .25rem; 
+      overflow: hidden; 
+    }
+    .reservation-table th, .reservation-table td { 
+      padding: 0.5rem; 
+      font-size: 0.9rem; 
+      border: 1px solid #dee2e6; 
+    }
+    @media (max-width: 576px) {
+      .reservation-table th, .reservation-table td { 
+        padding: 0.3rem; 
+        font-size: 0.8rem; 
+      }
+    }
+    .reservation-table tbody tr.hour-row { background-color: #e9ecef; }
+    .reservation-table tbody tr.half-hour-row { background-color: #f8f9fa; }
   </style>
 </head>
-<body class="bg-light">
+<body>
   <div class="container mt-5">
+    <!-- ヘッダー画像（必要に応じて画像ファイル名・altテキストを変更） -->
     <div class="text-center mb-4">
-      <img src="{{ url_for('static', filename='areas.png') }}" alt="NAKANIWAの4エリア" class="header-image">
+      <img src="{{ url_for('static', filename='rooms.png') }}" alt="会議室の画像" class="header-image">
     </div>
-    <h1 class="text-center mb-4">NAKANIWAエリア予約</h1>
+    <h1 class="text-center mb-4">川崎中央商店街振興組合会議室予約サイト</h1>
     <div class="card shadow p-4">
       <form id="reserveForm" action="/reserve" method="post">
         <!-- 企業選択 -->
@@ -46,7 +78,7 @@
             <option value="E社">E社</option>
             <option value="F社">F社</option>
           </select>
-          <p id="company_points" class="fw-bold text-primary mt-2">今月の利用可能ポイント: -</p>
+          <p id="company_points" class="fw-bold text-secondary mt-2">今月の利用可能ポイント: -</p>
         </div>
         <!-- 氏名、社員番号 -->
         <div class="mb-3">
@@ -62,44 +94,35 @@
           <label for="date" class="form-label">予約日:</label>
           <input type="date" id="date" name="date" class="form-control" required onchange="fetchDailyReservations(); checkOverlap(); updateCateringVisibility(); updatePoints();">
         </div>
-        <!-- 予約マトリクス -->
-        <div class="table-responsive">
-          <table class="table text-center table-sm reservation-table">
+        <!-- 予約マトリクス（予約状況の確認用） -->
+        <div class="table-responsive mb-4">
+          <table class="table text-center reservation-table">
             <thead>
-              <tr class="table-dark">
+              <tr class="table-secondary">
                 <th>時間</th>
-                <th>シタシミ</th>
-                <th>キヅキ</th>
-                <th>ニギワイ</th>
-                <th>オチツキ</th>
+                <th>会議室A</th>
+                <th>会議室B</th>
+                <th>大会議室</th>
               </tr>
             </thead>
             <tbody id="reservation_table">
             </tbody>
           </table>
         </div>
-        <!-- エリア選択 -->
+        <!-- 会議室選択：ラジオボタンで単一選択 -->
         <div class="mb-3">
-          <label class="form-label">エリアを選択:</label><br>
+          <label class="form-label">会議室を選択:</label><br>
           <div class="form-check form-check-inline">
-            <input type="checkbox" name="area" value="シタシミ" class="form-check-input area-checkbox" onchange="updateSelection(); checkOverlap();">
-            <label class="form-check-label">シタシミ</label>
+            <input type="radio" name="room" id="roomA" value="会議室A" class="form-check-input" required>
+            <label class="form-check-label" for="roomA">会議室A</label>
           </div>
           <div class="form-check form-check-inline">
-            <input type="checkbox" name="area" value="キヅキ" class="form-check-input area-checkbox" onchange="updateSelection(); checkOverlap();">
-            <label class="form-check-label">キヅキ</label>
+            <input type="radio" name="room" id="roomB" value="会議室B" class="form-check-input" required>
+            <label class="form-check-label" for="roomB">会議室B</label>
           </div>
           <div class="form-check form-check-inline">
-            <input type="checkbox" name="area" value="ニギワイ" class="form-check-input area-checkbox" onchange="updateSelection(); checkOverlap();">
-            <label class="form-check-label">ニギワイ</label>
-          </div>
-          <div class="form-check form-check-inline">
-            <input type="checkbox" name="area" value="オチツキ" class="form-check-input area-checkbox" onchange="updateSelection(); checkOverlap();">
-            <label class="form-check-label">オチツキ</label>
-          </div>
-          <div class="form-check form-check-inline">
-            <input type="checkbox" name="area" value="全体貸切" class="form-check-input" id="full-rental" onchange="selectFullRental(); checkOverlap();">
-            <label class="form-check-label">全体貸切</label>
+            <input type="radio" name="room" id="roomLarge" value="大会議室" class="form-check-input" required>
+            <label class="form-check-label" for="roomLarge">大会議室</label>
           </div>
         </div>
         <!-- 開始時刻 -->
@@ -127,7 +150,7 @@
         <div id="catering_section" style="display:none;">
           <hr>
           <h5 class="mt-3">ケータリング予約</h5>
-          <p>終了時刻が18:00以降のため、ケータリングサービスをご利用いただけます。</p>
+          <p>終了時刻が18:00以降の場合、ケータリングサービスをご利用いただけます。</p>
           <p class="form-text">
             1人1000円コース：3種のオードブル、パスタ<br>
             1人2000円コース：3種のオードブル、肉料理、パスタ、デザート
@@ -152,7 +175,7 @@
           <!-- ビール予約 -->
           <hr>
           <h5 class="mt-3">ビール予約</h5>
-          <p class="form-text">世界のビールをランダムにお届けします。1本250円です。予約する本数を入力してください。</p>
+          <p class="form-text">1本250円でご提供いたします。予約する本数を入力してください。</p>
           <div class="mb-3">
             <label for="beer_count" class="form-label">ビール本数:</label>
             <input type="number" min="0" id="beer_count" name="beer_count" class="form-control" value="0">
@@ -160,7 +183,7 @@
           <!-- ワイン予約 -->
           <hr>
           <h5 class="mt-3">ワイン予約</h5>
-          <p class="form-text">ワインは、スパークリング、白、赤の3種類です。各1本2000円です。予約する本数を入力してください。</p>
+          <p class="form-text">各1本2000円（スパークリング、白、赤）。予約する本数を入力してください。</p>
           <div class="mb-3">
             <label for="wine_sparkling" class="form-label">スパークリングワイン:</label>
             <input type="number" min="0" id="wine_sparkling" name="wine_sparkling" class="form-control" value="0">
@@ -208,7 +231,7 @@
       <div class="modal-content">
         <div class="modal-header bg-danger text-white">
           <h5 class="modal-title" id="errorModalLabel">予約エラー</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="戻る"></button>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="閉じる"></button>
         </div>
         <div class="modal-body" id="errorModalMessage">
           既存の予約と重複しています。予約内容を再確認してください。
@@ -229,6 +252,7 @@
     var overlapDetected = false;
     let overlapCheckTimeout;
   
+    // 同一日・時間帯で選択された会議室に既に予約があるかチェック
     function checkOverlap() {
       if (overlapCheckTimeout) clearTimeout(overlapCheckTimeout);
       overlapCheckTimeout = setTimeout(() => {
@@ -238,22 +262,18 @@
         let date = document.getElementById("date").value;
         let startTime = document.getElementById("start_time").value;
         let endTime = document.getElementById("end_time").value;
-        let areaElements = document.querySelectorAll('input[name="area"]:checked');
-        if (!date || !startTime || !endTime || areaElements.length === 0) {
+        let roomElement = document.querySelector("input[name='room']:checked");
+        if (!date || !startTime || !endTime || !roomElement) {
           overlapDetected = false;
           return;
         }
-        let selectedAreas = [];
-        areaElements.forEach(function(el) {
-          selectedAreas.push(el.value);
-        });
-        if (selectedAreas.includes("全体貸切")) {
-          selectedAreas = ["シタシミ", "キヅキ", "ニギワイ", "オチツキ"];
-        }
+        let selectedRoom = roomElement.value;
+  
         function timeToMinutes(t) {
           let parts = t.split(":");
           return parseInt(parts[0]) * 60 + parseInt(parts[1]);
         }
+  
         let startMin = timeToMinutes(startTime);
         let endMin = timeToMinutes(endTime);
         fetch(`/reservations_by_date?date=${date}&timestamp=${new Date().getTime()}`)
@@ -264,9 +284,9 @@
               let resStartMin = timeToMinutes(reservation.start_time);
               let resEndMin = timeToMinutes(reservation.end_time);
               if (startMin < resEndMin && endMin > resStartMin) {
-                let resAreas = reservation.area.split(", ").map(a => a.trim());
-                let intersection = selectedAreas.filter(area => resAreas.includes(area));
-                if (intersection.length > 0) overlapFound = true;
+                if (reservation.area.trim() === selectedRoom) {
+                  overlapFound = true;
+                }
               }
             });
             overlapDetected = overlapFound;
@@ -282,8 +302,6 @@
     document.getElementById("errorModal").addEventListener('hidden.bs.modal', function () {
       overlapDetected = false;
     });
-  
-    window.selectFullRental = selectFullRental;
   
     document.addEventListener("DOMContentLoaded", function () {
       let today = new Date();
@@ -419,20 +437,19 @@
         "16:00", "16:30", "17:00", "17:30",
         "18:00", "18:30", "19:00", "19:30"
       ];
-      let areaNames = ["シタシミ", "キヅキ", "ニギワイ", "オチツキ"];
+      let roomNames = ["会議室A", "会議室B", "大会議室"];
       for (let i = 0; i < timeSlots.length; i++) {
         let rowClass = timeSlots[i].endsWith(":00") ? "hour-row" : "half-hour-row";
         let row = `<tr class="${rowClass}"><td class="fw-bold">${timeSlots[i]}</td>`;
-        areaNames.forEach(area => {
+        roomNames.forEach(room => {
           let isReserved = data.some(res => {
             let resStartTime = res.start_time;
             let resEndTime = res.end_time;
-            let areaList = res.area.split(", ");
             let slotTime = timeSlots[i];
             return isTimeInRange(resStartTime, resEndTime, slotTime) &&
-                   (areaList.includes(area) || areaList.includes("全体貸切"));
+                   (res.area.trim() === room);
           });
-          let bgColor = isReserved ? getAreaColor(area) : "#ffffff";
+          let bgColor = isReserved ? getRoomColor(room) : "#ffffff";
           let textColor = isReserved ? "#ffffff" : "#000000";
           row += `<td style="background-color: ${bgColor}; color: ${textColor};">${isReserved ? "予約済" : ""}</td>`;
         });
@@ -452,13 +469,11 @@
       return date.toISOString().split("T")[0];
     }
   
-    function getAreaColor(area) {
-      switch(area) {
-        case "シタシミ": return "#007bff";
-        case "キヅキ": return "#dc3545";
-        case "ニギワイ": return "#ffc107";
-        case "オチツキ": return "#28a745";
-        case "全体貸切": return "#17a2b8";
+    function getRoomColor(room) {
+      switch(room) {
+        case "会議室A": return "#adb5bd";  // ライトグレー
+        case "会議室B": return "#868e96";  // ミディアムグレー
+        case "大会議室": return "#495057";  // ダークグレー
         default: return "#6c757d";
       }
     }
@@ -482,14 +497,7 @@
       let date = document.getElementById("date").value;
       let startTime = document.getElementById("start_time").value;
       let endTime = document.getElementById("end_time").value;
-      let areas = document.querySelectorAll('input[name="area"]:checked');
-      let numAreas = areas.length;
-      areas.forEach(area => {
-        if (area.value === "全体貸切") {
-          numAreas = 4;
-        }
-      });
-      if (!date || !startTime || !endTime || numAreas === 0) {
+      if (!date || !startTime || !endTime) {
         document.getElementById("points_needed").innerText = "必要ポイント: -";
         return;
       }
@@ -499,7 +507,8 @@
         document.getElementById("points_needed").innerText = "必要ポイント: 0 pt";
         return;
       }
-      fetch(`/calculate_points?date=${date}&start_time=${startTime}&end_time=${endTime}&num_areas=${numAreas}`)
+      // 予約対象は必ず1室なのでnum_areasは1固定
+      fetch(`/calculate_points?date=${date}&start_time=${startTime}&end_time=${endTime}&num_areas=1`)
         .then(response => response.json())
         .then(data => {
           if (data.points !== undefined) {
@@ -512,33 +521,6 @@
           console.error("エラー:", error);
           document.getElementById("points_needed").innerText = "必要ポイント: 0 pt";
         });
-    }
-  
-    function updateSelection() {
-      let areaCheckboxes = document.querySelectorAll('.area-checkbox');
-      let fullRental = document.getElementById('full-rental');
-      if (fullRental.checked) {
-        fullRental.checked = false;
-      }
-      let selectedCount = 0;
-      areaCheckboxes.forEach(box => { if (box.checked) { selectedCount++; } });
-      if (selectedCount === areaCheckboxes.length) {
-        areaCheckboxes.forEach(box => box.checked = false);
-        fullRental.checked = true;
-      }
-      updatePoints();
-    }
-  
-    function selectFullRental() {
-      let areaCheckboxes = document.querySelectorAll('.area-checkbox');
-      let fullRental = document.getElementById('full-rental');
-      if (fullRental.checked) { areaCheckboxes.forEach(box => box.checked = false); }
-      updatePoints();
-    }
-  
-    function showOverlapErrorModal() {
-      var errorModal = new bootstrap.Modal(document.getElementById("errorModal"));
-      errorModal.show();
     }
   </script>
 </body>

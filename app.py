@@ -15,13 +15,11 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
-# エリアの表示順（必要に応じて利用）
-area_order = {
-    "シタシミ": 1,
-    "キヅキ": 2,
-    "ニギワイ": 3,
-    "オチツキ": 4,
-    "全体貸切": 5
+# 会議室の表示順（必要に応じて利用）
+room_order = {
+    "会議室A": 1,
+    "会議室B": 2,
+    "大会議室": 3
 }
 
 # 予約データのテーブル（モデル）
@@ -30,7 +28,8 @@ class Reservation(db.Model):
     company = db.Column(db.String(50), nullable=False)    # 企業名
     name = db.Column(db.String(100), nullable=False)        # 氏名
     employee_id = db.Column(db.String(20), nullable=False)    # 社員番号
-    area = db.Column(db.String(100), nullable=False)          # 予約エリア（複数選択可）
+    # 以前は複数エリアだったが、今回は会議室予約なので1室のみ
+    area = db.Column(db.String(100), nullable=False)          
     date = db.Column(db.Date, nullable=False)                 # 日付型
     start_time = db.Column(db.String(5), nullable=False)
     end_time = db.Column(db.String(5), nullable=False)
@@ -50,6 +49,7 @@ class Reservation(db.Model):
             "company": self.company,
             "name": self.name,
             "employee_id": self.employee_id,
+            # 今回は area は会議室名として扱う
             "area": self.area,
             "date": self.date.strftime("%Y-%m-%d") if self.date else None,
             "start_time": self.start_time,
@@ -172,7 +172,7 @@ def reset_points():
         db.session.commit()
         print("企業のポイントをリセットしました！")
 
-def calculate_points(date, start_time_str, end_time_str, num_areas):
+def calculate_points(date, start_time_str, end_time_str, num_rooms):
     start_time = datetime.strptime(start_time_str, "%H:%M").time()
     end_time = datetime.strptime(end_time_str, "%H:%M").time()
     if isinstance(date, str):
@@ -182,7 +182,7 @@ def calculate_points(date, start_time_str, end_time_str, num_areas):
     duration = (datetime.combine(datetime.today(), end_time) - datetime.combine(datetime.today(), start_time)).total_seconds() / 1800
     is_peak_time = (weekday == 0 and start_time < time(12, 0)) or (weekday == 4 and end_time > time(13, 0))
     cost_per_30min = 20 if is_peak_time else 10
-    total_cost = int(duration) * cost_per_30min * num_areas
+    total_cost = int(duration) * cost_per_30min * num_rooms
     return max(total_cost, 0)
 
 @app.route('/reserve', methods=['GET', 'POST'])
@@ -192,7 +192,8 @@ def reserve():
             company_name = request.form['company']
             name = request.form['name']
             employee_id = request.form['employee_id']
-            areas = request.form.getlist('area')
+            # 予約する会議室は単一選択に変更
+            room = request.form['room']
             date = datetime.strptime(request.form['date'], "%Y-%m-%d").date()
             start_time_str = request.form['start_time']
             end_time_str = request.form['end_time']
@@ -220,34 +221,21 @@ def reserve():
             if start_datetime >= end_datetime:
                 return jsonify({"success": False, "message": "終了時間は開始時間より後に設定してください。"}), 400
 
-            area_str = ", ".join(areas)
-            all_areas = {"キヅキ", "オチツキ", "シタシミ", "ニギワイ"}
-            new_reservation_areas = set(areas)
-            existing_reservations = Reservation.query.filter(
-                and_(
-                    Reservation.date == date,
-                    Reservation.start_time < end_time_str,
-                    Reservation.end_time > start_time_str
-                )
-            ).all()
-            if "全体貸切" in areas:
-                for res in existing_reservations:
-                    existing_reserved_areas = set(a.strip() for a in res.area.split(","))
-                    if existing_reserved_areas & all_areas or "全体貸切" in existing_reserved_areas:
-                        return jsonify({"message": f"エラー: {date} の {start_time_str}〜{end_time_str} はすでに予約されています。"}), 400
-            else:
-                for res in existing_reservations:
-                    existing_reserved_areas = set(a.strip() for a in res.area.split(","))
-                    if "全体貸切" in existing_reserved_areas:
-                        return jsonify({"message": f"エラー: {date} の {start_time_str}〜{end_time_str} は貸切予約済みのため、予約できません。"}), 400
-                    if existing_reserved_areas & new_reservation_areas:
-                        return jsonify({"message": f"エラー: {date} の {start_time_str}〜{end_time_str} にすでに予約されているエリアがあります。"}), 400
+            # 重複予約の確認（同一日時・同一会議室の予約が既に存在するかチェック）
+            existing_reservation = Reservation.query.filter(
+                Reservation.date == date,
+                Reservation.area == room,
+                Reservation.start_time < end_time_str,
+                Reservation.end_time > start_time_str
+            ).first()
+            if existing_reservation:
+                return jsonify({"message": f"エラー: {date} の {start_time_str}〜{end_time_str} は既に {room} が予約されています。"}), 400
 
             company_record = CompanyPoints.query.filter_by(company=company_name).first()
             if not company_record:
                 return jsonify({"message": f"エラー: 企業情報が見つかりません（{company_name}）"}), 400
-            num_areas = 4 if "全体貸切" in areas else len(areas)
-            required_points = calculate_points(date, start_time_str, end_time_str, num_areas)
+            num_rooms = 1  # 予約は必ず1室のみ
+            required_points = calculate_points(date, start_time_str, end_time_str, num_rooms)
             if company_record.points < required_points:
                 return jsonify({
                     "message": f"エラー: ポイントが不足しています（必要: {required_points}pt, 保有: {company_record.points}pt）"
@@ -262,7 +250,7 @@ def reserve():
                 company=company_name,
                 name=name,
                 employee_id=employee_id,
-                area=area_str,
+                area=room,  # 予約会議室を保存（カラム名は area のまま）
                 date=date,
                 start_time=start_time_str,
                 end_time=end_time_str,
@@ -278,7 +266,7 @@ def reserve():
             db.session.commit()
             return jsonify(
                 success=True,
-                message=f"予約完了: {date} の {start_time_str} から {end_time_str} まで {area_str} を予約しました！",
+                message=f"予約完了: {date} の {start_time_str} から {end_time_str} まで {room} を予約しました！",
                 remaining_points=company_record.points
             )
         except Exception as e:
@@ -292,13 +280,8 @@ def calculate_reservation_points():
     date = request.args.get('date')
     start_time = request.args.get('start_time')
     end_time = request.args.get('end_time')
-    num_areas = request.args.get('num_areas')
-    if not date or not start_time or not end_time or not num_areas:
+    if not date or not start_time or not end_time:
         return jsonify({'error': 'Invalid input'}), 400
-    try:
-        num_areas = int(num_areas)
-    except ValueError:
-        return jsonify({'error': 'Invalid num_areas'}), 400
     try:
         start_hour, start_minute = map(int, start_time.split(':'))
         end_hour, end_minute = map(int, end_time.split(':'))
@@ -306,8 +289,8 @@ def calculate_reservation_points():
         if duration_minutes <= 0:
             return jsonify({'error': 'Invalid time range'}), 400
         time_slots = duration_minutes / 30
-        base_points_per_area = 10
-        total_points = int(base_points_per_area * num_areas * time_slots)
+        base_points = 10
+        total_points = int(base_points * 1 * time_slots)  # 1室分として計算
         return jsonify({'points': total_points})
     except Exception as e:
         return jsonify({'error': 'Calculation error'}), 500
